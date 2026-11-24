@@ -1,0 +1,2500 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lineage — Family Tree Manager v3</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0d0d0f;
+    --bg2: #141418;
+    --bg3: #1c1c22;
+    --bg4: #232329;
+    --border: rgba(255,255,255,0.07);
+    --border2: rgba(255,255,255,0.14);
+    --text: #f0ede8;
+    --text2: #a09c94;
+    --text3: #5c5852;
+    --accent: #c9a96e;
+    --accent2: #8b6e3f;
+    --accent-glow: rgba(201,169,110,0.15);
+    --red: #c94e4e;
+    --blue: #4e7ec9;
+    --green: #4ec97a;
+    --purple: #8e4ec9;
+    --gold: #c9a94e;
+    --panel-w: 320px;
+    --bar-h: 56px;
+    --radius: 10px;
+    --node-w: 148px;
+    --node-h: 192px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    overflow: hidden;
+    height: 100vh;
+    width: 100vw;
+  }
+
+  /* ── TOP BAR ── */
+  #topbar {
+    position: fixed; top: 0; left: 0; right: 0; height: var(--bar-h);
+    background: rgba(13,13,15,0.92);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; padding: 0 16px; gap: 12px;
+    z-index: 1000;
+  }
+  .app-logo {
+    font-family: 'Cinzel', serif;
+    font-size: 18px; font-weight: 700;
+    color: var(--accent);
+    letter-spacing: 0.06em;
+    white-space: nowrap;
+    user-select: none;
+  }
+  .app-logo span { color: var(--text2); font-weight: 400; font-size: 13px; margin-left: 8px; font-family: 'DM Sans', sans-serif; letter-spacing: 0; }
+  .bar-divider { width: 1px; height: 28px; background: var(--border2); flex-shrink: 0; }
+  .bar-btn {
+    background: none; border: 1px solid var(--border2); color: var(--text2);
+    border-radius: 7px; cursor: pointer; font-family: 'DM Sans', sans-serif;
+    font-size: 13px; padding: 6px 12px; display: flex; align-items: center; gap: 6px;
+    transition: all 0.15s; white-space: nowrap;
+  }
+  .bar-btn:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-glow); }
+  .bar-btn.primary {
+    background: var(--accent); color: #1a1208; border-color: var(--accent);
+    font-weight: 600;
+  }
+  .bar-btn.primary:hover { background: #dbb97e; }
+  .bar-btn svg { width: 14px; height: 14px; }
+
+  #search-wrap {
+    flex: 1; max-width: 300px;
+    position: relative;
+  }
+  #search-wrap svg {
+    position: absolute; left: 10px; top: 50%; transform: translateY(-50%);
+    width: 14px; height: 14px; color: var(--text3);
+  }
+  #search-input {
+    width: 100%; background: var(--bg3); border: 1px solid var(--border2);
+    color: var(--text); border-radius: 7px; padding: 7px 12px 7px 32px;
+    font-family: 'DM Sans', sans-serif; font-size: 13px; outline: none;
+    transition: border-color 0.15s;
+  }
+  #search-input:focus { border-color: var(--accent); }
+  #search-input::placeholder { color: var(--text3); }
+
+  #save-select {
+    background: var(--bg3); border: 1px solid var(--border2); color: var(--text);
+    border-radius: 7px; padding: 6px 10px; font-family: 'DM Sans', sans-serif;
+    font-size: 13px; cursor: pointer; outline: none; max-width: 160px;
+  }
+
+  /* ── CANVAS AREA ── */
+  #canvas-wrap {
+    position: fixed; top: var(--bar-h); left: 0; right: 0; bottom: 0;
+    overflow: hidden; background: var(--bg);
+    background-image:
+      radial-gradient(circle at 20% 30%, rgba(201,169,110,0.03) 0%, transparent 50%),
+      radial-gradient(circle at 80% 70%, rgba(78,126,201,0.03) 0%, transparent 50%);
+  }
+  #canvas-wrap::before {
+    content: '';
+    position: absolute; inset: 0;
+    background-image:
+      linear-gradient(var(--border) 1px, transparent 1px),
+      linear-gradient(90deg, var(--border) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+  }
+  #canvas {
+    position: absolute; top: 0; left: 0;
+    transform-origin: 0 0;
+    will-change: transform;
+  }
+  #svg-layer {
+    position: absolute; top: 0; left: 0;
+    pointer-events: none;
+    overflow: visible;
+  }
+
+  /* ── NODE CARDS ── */
+  .node {
+    position: absolute;
+    width: var(--node-w);
+    background: var(--bg3);
+    border: 1.5px solid var(--border2);
+    border-radius: var(--radius);
+    cursor: grab;
+    user-select: none;
+    transition: border-color 0.15s, box-shadow 0.15s, transform 0.07s;
+    overflow: hidden;
+  }
+  .node:hover { border-color: var(--border2); transform: translateY(-1px); }
+  .node.selected {
+    border-color: var(--accent) !important;
+    box-shadow: 0 0 0 2px var(--accent-glow), 0 4px 20px rgba(0,0,0,0.5);
+  }
+  .node.highlighted { border-color: #4e7ec9 !important; box-shadow: 0 0 0 2px rgba(78,126,201,0.2); }
+  .node.dragging { cursor: grabbing; box-shadow: 0 8px 40px rgba(0,0,0,0.7); transform: scale(1.03); z-index: 999 !important; }
+
+  .node-branch-bar {
+    height: 3px;
+    background: var(--accent);
+    flex-shrink: 0;
+  }
+  .node-img-wrap {
+    width: 100%; aspect-ratio: 1;
+    background: var(--bg4);
+    overflow: hidden;
+    position: relative;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .node-img-wrap img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .node-avatar-placeholder {
+    width: 100%; height: 100%;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Cinzel', serif; font-size: 28px; font-weight: 600;
+    color: var(--text3);
+    background: linear-gradient(135deg, var(--bg4) 0%, var(--bg3) 100%);
+  }
+  .node-info {
+    padding: 8px 10px 10px;
+  }
+  .node-name {
+    font-size: 12px; font-weight: 600; color: var(--text);
+    text-overflow: ellipsis; overflow: hidden; white-space: nowrap;
+    line-height: 1.3; margin-bottom: 2px;
+  }
+  .node-branch-label {
+    font-size: 10px; color: var(--text3); text-overflow: ellipsis;
+    overflow: hidden; white-space: nowrap; text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+  .node-dates {
+    font-size: 10px; color: var(--text3); margin-top: 2px;
+  }
+  .node-badge-row {
+    display: flex; gap: 3px; margin-top: 4px; flex-wrap: wrap;
+  }
+  .node-badge {
+    font-size: 9px; padding: 1px 5px; border-radius: 3px;
+    font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase;
+    background: var(--bg4); color: var(--text3); border: 1px solid var(--border);
+  }
+  .node-link-dot {
+    position: absolute; bottom: 6px; right: 6px;
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--accent); opacity: 0.7;
+  }
+
+  /* ── ZOOM CONTROLS ── */
+  #zoom-controls {
+    position: fixed; bottom: 24px; right: 24px;
+    display: flex; flex-direction: column; gap: 4px;
+    z-index: 900;
+  }
+  .zoom-btn {
+    width: 36px; height: 36px;
+    background: var(--bg3); border: 1px solid var(--border2);
+    color: var(--text2); border-radius: 8px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px; transition: all 0.15s;
+  }
+  .zoom-btn:hover { border-color: var(--accent); color: var(--accent); }
+  #zoom-label {
+    text-align: center; font-size: 10px; color: var(--text3);
+    font-weight: 500; letter-spacing: 0.04em;
+  }
+
+  /* ── STATUS BAR ── */
+  #statusbar {
+    position: fixed; bottom: 0; left: 0; right: 0; height: 26px;
+    background: var(--bg2); border-top: 1px solid var(--border);
+    display: flex; align-items: center; padding: 0 16px; gap: 20px;
+    font-size: 11px; color: var(--text3); z-index: 900;
+  }
+  .status-item { display: flex; align-items: center; gap: 5px; }
+  .status-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--green); }
+
+  /* ── NOTIFICATION TOAST ── */
+  #toast {
+    position: fixed; bottom: 40px; left: 50%; transform: translateX(-50%) translateY(20px);
+    background: var(--bg3); border: 1px solid var(--border2); color: var(--text);
+    padding: 9px 18px; border-radius: 8px; font-size: 13px; font-weight: 500;
+    opacity: 0; transition: all 0.25s; z-index: 2000; pointer-events: none;
+    white-space: nowrap;
+  }
+  #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  /* ── SIDE PANEL PLACEHOLDER ── */
+  #side-panel {
+    position: fixed; top: var(--bar-h); right: -340px; bottom: 26px;
+    width: var(--panel-w); background: var(--bg2); border-left: 1px solid var(--border);
+    z-index: 800; transition: right 0.3s cubic-bezier(0.4,0,0.2,1);
+    display: flex; flex-direction: column;
+    overflow: hidden;
+  }
+  #side-panel.open { right: 0; }
+  .panel-header {
+    padding: 16px 16px 12px;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .panel-title {
+    font-family: 'Cinzel', serif; font-size: 13px;
+    color: var(--accent); letter-spacing: 0.07em; font-weight: 600;
+  }
+  .panel-close {
+    background: none; border: none; color: var(--text3);
+    cursor: pointer; padding: 4px; border-radius: 5px;
+    display: flex; align-items: center; justify-content: center;
+    transition: color 0.15s;
+  }
+  .panel-close:hover { color: var(--text); }
+  .panel-body { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 14px; }
+  .panel-body::-webkit-scrollbar { width: 4px; }
+  .panel-body::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+  .field-group { display: flex; flex-direction: column; gap: 5px; }
+  .field-label { font-size: 11px; color: var(--text3); font-weight: 500; text-transform: uppercase; letter-spacing: 0.07em; }
+  .field-input {
+    background: var(--bg3); border: 1px solid var(--border2); color: var(--text);
+    border-radius: 7px; padding: 8px 10px; font-family: 'DM Sans', sans-serif;
+    font-size: 13px; outline: none; transition: border-color 0.15s; width: 100%;
+  }
+  .field-input:focus { border-color: var(--accent); }
+  .field-input::placeholder { color: var(--text3); }
+
+  .img-preview-wrap {
+    width: 100%; aspect-ratio: 1; background: var(--bg3); border-radius: 8px;
+    border: 1px dashed var(--border2); display: flex; align-items: center;
+    justify-content: center; overflow: hidden; cursor: pointer; position: relative;
+    transition: border-color 0.15s;
+  }
+  .img-preview-wrap:hover { border-color: var(--accent); }
+  .img-preview-wrap img { width: 100%; height: 100%; object-fit: cover; }
+  .img-preview-hint { font-size: 12px; color: var(--text3); text-align: center; padding: 8px; }
+
+  .color-swatches { display: flex; flex-wrap: wrap; gap: 6px; }
+  .swatch {
+    width: 24px; height: 24px; border-radius: 5px; cursor: pointer;
+    border: 2px solid transparent; transition: border-color 0.15s, transform 0.1s;
+  }
+  .swatch:hover { transform: scale(1.15); }
+  .swatch.active { border-color: white; }
+
+  .panel-action-row { display: flex; gap: 8px; }
+  .panel-btn {
+    flex: 1; background: var(--bg3); border: 1px solid var(--border2);
+    color: var(--text2); border-radius: 7px; padding: 8px;
+    font-family: 'DM Sans', sans-serif; font-size: 12px; cursor: pointer;
+    transition: all 0.15s; font-weight: 500;
+  }
+  .panel-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .panel-btn.danger:hover { border-color: var(--red); color: var(--red); }
+
+  .rel-list { display: flex; flex-direction: column; gap: 4px; }
+  .rel-item {
+    background: var(--bg3); border: 1px solid var(--border); border-radius: 6px;
+    padding: 6px 10px; display: flex; align-items: center; justify-content: space-between;
+    font-size: 12px;
+  }
+  .rel-name { color: var(--text2); }
+  .rel-type { font-size: 10px; color: var(--text3); font-weight: 500; text-transform: uppercase; letter-spacing: 0.05em; }
+  .rel-del { background: none; border: none; color: var(--text3); cursor: pointer; font-size: 15px; padding: 0 2px; transition: color 0.15s; }
+  .rel-del:hover { color: var(--red); }
+
+  .add-rel-row { display: flex; gap: 6px; }
+  .add-rel-row .field-input { flex: 1; }
+  .add-rel-row select.field-input { padding: 8px 6px; }
+  .add-rel-btn {
+    background: none; border: 1px solid var(--border2); color: var(--text2);
+    border-radius: 7px; padding: 8px 12px; cursor: pointer; font-size: 13px;
+    transition: all 0.15s; white-space: nowrap;
+  }
+  .add-rel-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* ── CONTEXT MENU ── */
+  #ctx-menu {
+    position: fixed; background: var(--bg3); border: 1px solid var(--border2);
+    border-radius: 9px; padding: 5px; z-index: 2000;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+    display: none; min-width: 160px;
+  }
+  .ctx-item {
+    padding: 7px 12px; border-radius: 5px; font-size: 13px; color: var(--text2);
+    cursor: pointer; display: flex; align-items: center; gap: 8px;
+    transition: background 0.1s, color 0.1s;
+  }
+  .ctx-item:hover { background: var(--bg4); color: var(--text); }
+  .ctx-item.danger:hover { color: var(--red); }
+  .ctx-sep { height: 1px; background: var(--border); margin: 4px 0; }
+  .ctx-item svg { width: 13px; height: 13px; flex-shrink: 0; }
+
+  /* ── SVG EDGES ── */
+  .edge-bio { stroke: rgba(201,169,110,0.6); stroke-width: 1.5; fill: none; }
+  .edge-potential { stroke: rgba(201,169,110,0.35); stroke-width: 1.5; fill: none; stroke-dasharray: 6 4; }
+  .edge-adopted { stroke: rgba(78,126,201,0.55); stroke-width: 1.5; fill: none; stroke-dasharray: 3 3; }
+  .edge-spouse { stroke: rgba(255,255,255,0.18); stroke-width: 1; fill: none; }
+  .edge-junction { fill: rgba(201,169,110,0.5); stroke: none; }
+  .edge-junction-adopted { fill: rgba(78,126,201,0.45); stroke: none; }
+
+  /* ── BRANCH FILTER PILLS ── */
+  #branch-filters {
+    position: fixed; bottom: 36px; left: 16px;
+    display: flex; gap: 6px; flex-wrap: wrap; max-width: 60vw;
+    z-index: 900;
+  }
+  .branch-pill {
+    padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 600;
+    cursor: pointer; border: 1px solid rgba(255,255,255,0.12);
+    transition: all 0.15s; color: #fff; text-transform: uppercase;
+    letter-spacing: 0.05em; opacity: 0.7;
+  }
+  .branch-pill:hover { opacity: 1; transform: translateY(-1px); }
+  .branch-pill.active { opacity: 1; box-shadow: 0 0 0 2px rgba(255,255,255,0.3); }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+
+  /* connection-mode indicator */
+  #conn-mode-banner {
+    position: fixed; top: calc(var(--bar-h) + 12px); left: 50%;
+    transform: translateX(-50%);
+    background: rgba(201,169,110,0.15); border: 1px solid var(--accent);
+    color: var(--accent); font-size: 12px; font-weight: 600;
+    padding: 6px 16px; border-radius: 20px; z-index: 1000;
+    display: none; pointer-events: none; letter-spacing: 0.04em;
+  }
+
+  /* minimap */
+  #minimap {
+    position: fixed; bottom: 36px; right: 80px;
+    width: 140px; height: 90px;
+    background: var(--bg2); border: 1px solid var(--border2);
+    border-radius: 8px; overflow: hidden; z-index: 900;
+    cursor: pointer;
+  }
+  #minimap canvas { width: 100%; height: 100%; display: block; }
+
+  @keyframes fadeIn { from { opacity: 0; transform: scale(0.94); } to { opacity: 1; transform: scale(1); } }
+  .node { animation: fadeIn 0.2s ease; }
+
+  /* ── PART 3 ADDITIONS ── */
+
+  /* Undo/Redo feedback */
+  #undo-redo-bar {
+    position: fixed; top: calc(var(--bar-h) + 8px); left: 50%;
+    transform: translateX(-50%);
+    display: flex; gap: 4px; z-index: 950;
+  }
+  .ur-btn {
+    background: var(--bg2); border: 1px solid var(--border2); color: var(--text3);
+    border-radius: 6px; padding: 5px 10px; font-size: 12px; cursor: pointer;
+    font-family: 'DM Sans', sans-serif; transition: all 0.15s; font-weight: 500;
+    display: flex; align-items: center; gap: 5px;
+  }
+  .ur-btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+  .ur-btn:disabled { opacity: 0.3; cursor: default; }
+  .ur-btn svg { width: 12px; height: 12px; }
+
+  /* Generation depth badges on nodes */
+  .node-gen-badge {
+    position: absolute; top: 4px; left: 4px;
+    background: rgba(0,0,0,0.55); border: 1px solid var(--border2);
+    border-radius: 3px; font-size: 9px; font-weight: 600;
+    color: var(--text3); padding: 1px 4px; letter-spacing: 0.04em;
+    pointer-events: none;
+  }
+
+  /* Generation lane backgrounds */
+  .gen-lane {
+    position: absolute; left: -9999px; right: -9999px;
+    pointer-events: none; border-top: 1px dashed rgba(255,255,255,0.04);
+  }
+  .gen-lane-label {
+    position: absolute; left: 0; font-size: 10px; color: var(--text3);
+    font-family: 'Cinzel', serif; letter-spacing: 0.05em; pointer-events: none;
+    white-space: nowrap; opacity: 0.5;
+  }
+
+  /* Path finder highlight */
+  .node.path-highlight {
+    border-color: #4ec97a !important;
+    box-shadow: 0 0 0 3px rgba(78,201,122,0.2), 0 0 20px rgba(78,201,122,0.1) !important;
+  }
+  .edge-path-highlight {
+    stroke: #4ec97a !important;
+    stroke-width: 3 !important;
+    filter: drop-shadow(0 0 4px rgba(78,201,122,0.5));
+  }
+
+  /* Path Finder modal */
+  #path-modal { }
+  .path-result-chain {
+    display: flex; align-items: center; flex-wrap: wrap; gap: 6px; padding: 12px;
+    background: var(--bg3); border-radius: 8px; border: 1px solid var(--border);
+  }
+  .path-node-chip {
+    background: var(--bg4); border: 1px solid var(--border2); border-radius: 5px;
+    padding: 4px 10px; font-size: 12px; color: var(--text);
+    cursor: pointer; transition: border-color 0.12s;
+    white-space: nowrap;
+  }
+  .path-node-chip:hover { border-color: var(--accent); }
+  .path-arrow { color: var(--text3); font-size: 14px; }
+  .path-rel-label {
+    font-size: 10px; color: var(--text3); text-align: center;
+    white-space: nowrap;
+  }
+
+  /* Relationship label on edges in path-finder mode */
+  .edge-label-text {
+    font-size: 9px; fill: var(--text3); font-family: 'DM Sans', sans-serif;
+    pointer-events: none;
+  }
+
+  /* Keyboard shortcuts modal */
+  #shortcuts-modal { }
+  .shortcut-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 6px;
+  }
+  .shortcut-row {
+    display: flex; align-items: center; gap: 8px;
+    background: var(--bg3); border-radius: 6px; padding: 7px 10px;
+  }
+  .shortcut-keys { display: flex; gap: 3px; flex-shrink: 0; }
+  .shortcut-key {
+    background: var(--bg4); border: 1px solid var(--border2); border-radius: 4px;
+    padding: 2px 6px; font-size: 10px; font-family: monospace; color: var(--text2);
+    white-space: nowrap;
+  }
+  .shortcut-desc { font-size: 12px; color: var(--text2); }
+
+  /* Node notes popover */
+  .notes-popover {
+    position: fixed; z-index: 2500; background: var(--bg2);
+    border: 1px solid var(--border2); border-radius: 9px; padding: 12px 14px;
+    width: 220px; box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+    font-size: 12px; color: var(--text2); line-height: 1.5;
+  }
+  .notes-popover-name {
+    font-size: 11px; font-weight: 600; color: var(--accent);
+    text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 6px;
+  }
+
+  /* Stats panel */
+  #stats-panel {
+    position: fixed; top: calc(var(--bar-h) + 12px); right: 12px;
+    background: var(--bg2); border: 1px solid var(--border2);
+    border-radius: 10px; padding: 14px; z-index: 900;
+    width: 200px; display: none;
+  }
+  #stats-panel.open { display: block; }
+  .stat-row {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 5px 0; border-bottom: 1px solid var(--border); font-size: 12px;
+  }
+  .stat-row:last-child { border-bottom: none; }
+  .stat-label { color: var(--text3); }
+  .stat-value { color: var(--text); font-weight: 600; font-variant-numeric: tabular-nums; }
+  .stat-title {
+    font-family: 'Cinzel', serif; font-size: 11px; color: var(--accent);
+    letter-spacing: 0.07em; margin-bottom: 10px;
+  }
+
+  /* Print styles */
+  @media print {
+    #topbar, #zoom-controls, #statusbar, #minimap, #side-panel,
+    #branch-filters, #bulk-toolbar, #edge-legend, #kb-hints,
+    #undo-redo-bar, #ctx-menu, #stats-panel { display: none !important; }
+    body { background: white !important; color: black !important; overflow: visible !important; }
+    #canvas-wrap { position: static !important; overflow: visible !important; top: 0 !important; }
+    #canvas-wrap::before { display: none !important; }
+    #canvas { transform: none !important; }
+  }
+
+  /* Export overlay */
+  #export-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 5000;
+    display: none; align-items: center; justify-content: center;
+  }
+  #export-overlay.visible { display: flex; }
+  .export-box {
+    background: var(--bg2); border: 1px solid var(--border2); border-radius: 14px;
+    padding: 28px 32px; text-align: center; width: 360px;
+  }
+  .export-title { font-family: 'Cinzel', serif; color: var(--accent); font-size: 14px; letter-spacing: 0.08em; margin-bottom: 16px; }
+  .export-options { display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px; }
+  .export-option-btn {
+    background: var(--bg3); border: 1px solid var(--border2); color: var(--text2);
+    border-radius: 8px; padding: 12px 16px; cursor: pointer; font-family: 'DM Sans', sans-serif;
+    font-size: 13px; font-weight: 500; transition: all 0.15s; text-align: left;
+    display: flex; align-items: center; gap: 12px;
+  }
+  .export-option-btn:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-glow); }
+  .export-option-btn svg { width: 18px; height: 18px; flex-shrink: 0; }
+  .export-option-desc { font-size: 11px; color: var(--text3); margin-top: 1px; display: block; }
+
+  /* Relation badge in panel */
+  .relation-how {
+    background: var(--accent-glow); border: 1px solid var(--accent2);
+    border-radius: 6px; padding: 8px 10px; font-size: 12px; color: var(--accent);
+    line-height: 1.4;
+  }
+
+  /* Topbar active state */
+  .bar-btn.active { border-color: var(--accent); color: var(--accent); background: var(--accent-glow); }
+
+  /* MODAL OVERLAY */
+  .modal-overlay {
+    position: fixed; inset: 0; z-index: 3000;
+    background: rgba(0,0,0,0.7);
+    display: flex; align-items: center; justify-content: center;
+    backdrop-filter: blur(4px);
+    animation: fadeIn 0.15s ease;
+  }
+  .modal {
+    background: var(--bg2); border: 1px solid var(--border2);
+    border-radius: 14px; width: 520px; max-width: 95vw;
+    max-height: 85vh; display: flex; flex-direction: column;
+    overflow: hidden; box-shadow: 0 24px 80px rgba(0,0,0,0.6);
+  }
+  .modal-header {
+    padding: 18px 20px 14px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between; flex-shrink: 0;
+  }
+  .modal-title { font-family: 'Cinzel', serif; font-size: 14px; color: var(--accent); letter-spacing: 0.08em; font-weight: 600; }
+  .modal-close { background: none; border: none; color: var(--text3); cursor: pointer; padding: 4px; border-radius: 5px; display: flex; align-items: center; justify-content: center; transition: color 0.15s; }
+  .modal-close:hover { color: var(--text); }
+  .modal-body { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 14px; }
+  .modal-footer { padding: 14px 20px; border-top: 1px solid var(--border); display: flex; gap: 8px; justify-content: flex-end; flex-shrink: 0; }
+  .modal-btn { padding: 8px 18px; border-radius: 7px; font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 500; cursor: pointer; transition: all 0.15s; border: 1px solid var(--border2); background: none; color: var(--text2); }
+  .modal-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .modal-btn.primary { background: var(--accent); color: #1a1208; border-color: var(--accent); }
+  .modal-btn.primary:hover { background: #dbb97e; }
+  .modal-btn.danger:hover { border-color: var(--red); color: var(--red); }
+
+  /* BRANCH MANAGER */
+  .branch-row { display: flex; align-items: center; gap: 10px; background: var(--bg3); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; }
+  .branch-color-btn { width: 28px; height: 28px; border-radius: 6px; border: 2px solid rgba(255,255,255,0.15); cursor: pointer; flex-shrink: 0; transition: transform 0.1s; }
+  .branch-color-btn:hover { transform: scale(1.1); }
+  .branch-name-input { flex: 1; background: none; border: none; color: var(--text); font-family: 'DM Sans', sans-serif; font-size: 13px; outline: none; }
+  .branch-name-input::placeholder { color: var(--text3); }
+  .branch-count { font-size: 11px; color: var(--text3); flex-shrink: 0; white-space: nowrap; }
+  .branch-del-btn { background: none; border: none; color: var(--text3); cursor: pointer; padding: 3px; border-radius: 4px; transition: color 0.15s; flex-shrink: 0; font-size: 16px; line-height: 1; }
+  .branch-del-btn:hover { color: var(--red); }
+
+  /* Color picker popup */
+  .color-picker-popup { position: fixed; z-index: 4000; background: var(--bg2); border: 1px solid var(--border2); border-radius: 10px; padding: 12px; box-shadow: 0 8px 32px rgba(0,0,0,0.5); width: 200px; }
+  .color-picker-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; margin-bottom: 10px; }
+  .cp-swatch { width: 28px; height: 28px; border-radius: 6px; cursor: pointer; border: 2px solid transparent; transition: all 0.12s; }
+  .cp-swatch:hover { transform: scale(1.15); border-color: rgba(255,255,255,0.4); }
+  .cp-swatch.active { border-color: white; }
+  .cp-hex-row { display: flex; gap: 6px; align-items: center; }
+  .cp-hex-input { flex: 1; background: var(--bg3); border: 1px solid var(--border2); color: var(--text); border-radius: 5px; padding: 5px 8px; font-size: 12px; font-family: monospace; outline: none; }
+  .cp-preview { width: 24px; height: 24px; border-radius: 4px; flex-shrink: 0; }
+
+  /* SAVE FILE MANAGER */
+  .save-file-row { display: flex; align-items: center; gap: 10px; background: var(--bg3); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; cursor: pointer; transition: border-color 0.15s; }
+  .save-file-row:hover { border-color: var(--border2); }
+  .save-file-row.active { border-color: var(--accent); background: var(--accent-glow); }
+  .save-file-icon { width: 32px; height: 32px; border-radius: 7px; background: var(--bg4); display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 16px; }
+  .save-file-info { flex: 1; overflow: hidden; }
+  .save-file-name { font-size: 13px; font-weight: 500; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .save-file-meta { font-size: 11px; color: var(--text3); margin-top: 1px; }
+  .save-file-actions { display: flex; gap: 4px; flex-shrink: 0; }
+  .save-file-btn { background: none; border: 1px solid var(--border); color: var(--text3); border-radius: 5px; padding: 4px 8px; font-size: 11px; cursor: pointer; transition: all 0.12s; font-family: 'DM Sans', sans-serif; }
+  .save-file-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .save-file-btn.danger:hover { border-color: var(--red); color: var(--red); }
+
+  /* BULK TOOLBAR */
+  #bulk-toolbar { position: fixed; bottom: 36px; left: 50%; transform: translateX(-50%); background: var(--bg2); border: 1px solid var(--border2); border-radius: 10px; padding: 8px 14px; display: none; align-items: center; gap: 10px; z-index: 890; white-space: nowrap; box-shadow: 0 4px 24px rgba(0,0,0,0.5); }
+  #bulk-toolbar.visible { display: flex; }
+  .bulk-label { font-size: 12px; color: var(--text3); }
+  .bulk-count { font-size: 13px; color: var(--accent); font-weight: 600; }
+  .bulk-divider { width: 1px; height: 20px; background: var(--border2); }
+  .bulk-btn { background: none; border: 1px solid var(--border2); color: var(--text2); border-radius: 6px; padding: 5px 10px; font-size: 12px; cursor: pointer; font-family: 'DM Sans', sans-serif; transition: all 0.12s; font-weight: 500; }
+  .bulk-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .bulk-btn.danger:hover { border-color: var(--red); color: var(--red); }
+
+  /* EDGE LEGEND */
+  #edge-legend { position: fixed; bottom: 36px; right: 86px; background: var(--bg2); border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; z-index: 890; display: flex; flex-direction: column; gap: 5px; }
+  .legend-row { display: flex; align-items: center; gap: 8px; font-size: 10px; color: var(--text3); }
+  .legend-line { width: 28px; height: 2px; flex-shrink: 0; }
+
+  /* LINK PREVIEW */
+  .link-preview-card { background: var(--bg4); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; display: flex; align-items: center; gap: 10px; }
+  .link-preview-domain { font-size: 11px; color: var(--text3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+  .link-preview-open { background: none; border: 1px solid var(--border2); color: var(--text3); border-radius: 5px; padding: 4px 8px; font-size: 11px; cursor: pointer; transition: all 0.12s; font-family: 'DM Sans', sans-serif; white-space: nowrap; }
+  .link-preview-open:hover { border-color: var(--accent); color: var(--accent); }
+  .link-auto-img-btn { background: var(--accent-glow); border: 1px solid var(--accent); color: var(--accent); border-radius: 5px; padding: 4px 8px; font-size: 11px; cursor: pointer; font-family: 'DM Sans', sans-serif; white-space: nowrap; transition: all 0.12s; }
+  .link-auto-img-btn:hover { background: var(--accent); color: #1a1208; }
+
+  /* NODE HOVER ACTIONS */
+  .node-actions { position: absolute; top: 4px; right: 4px; display: none; gap: 3px; z-index: 10; }
+  .node:hover .node-actions { display: flex; }
+  .node-action-btn { width: 20px; height: 20px; border-radius: 4px; background: rgba(13,13,15,0.85); border: 1px solid var(--border2); color: var(--text2); cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 11px; transition: all 0.12s; line-height: 1; }
+  .node-action-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* KB HINTS */
+  #kb-hints { position: fixed; bottom: 36px; left: 16px; font-size: 10px; color: var(--text3); display: flex; flex-direction: column; gap: 3px; z-index: 880; pointer-events: none; }
+  .kb-hint { display: flex; gap: 6px; align-items: center; }
+  .kb-key { background: var(--bg3); border: 1px solid var(--border2); border-radius: 3px; padding: 1px 5px; font-size: 9px; font-family: monospace; color: var(--text2); }
+
+  /* SECTION DIVIDERS in panel */
+  .panel-section-title { font-size: 10px; color: var(--text3); text-transform: uppercase; letter-spacing: 0.08em; font-weight: 600; padding-bottom: 4px; border-bottom: 1px solid var(--border); margin-top: 4px; }
+
+  /* Drag-select rubber-band */
+  #rubber-band { position: fixed; border: 1px solid var(--accent); background: var(--accent-glow); pointer-events: none; z-index: 800; display: none; }
+</style>
+</head>
+<body>
+
+<!-- TOP BAR -->
+<div id="topbar">
+  <div class="app-logo">LINEAGE <span>v3</span></div>
+  <div class="bar-divider"></div>
+
+  <div id="search-wrap">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+    <input id="search-input" type="text" placeholder="Search people...">
+  </div>
+
+  <div class="bar-divider"></div>
+
+  <button class="bar-btn primary" id="btn-add-person" title="Add Person (A)">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
+    Add Person
+  </button>
+
+  <button class="bar-btn" id="btn-connect" title="Connect nodes (C)">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+    Connect
+  </button>
+
+  <button class="bar-btn" id="btn-path-finder" title="Find relationship path (P)">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="6" cy="6" r="3"/><circle cx="18" cy="18" r="3"/><path d="M6 9v3a3 3 0 0 0 3 3h6a3 3 0 0 0 3-3V9"/></svg>
+    Path
+  </button>
+
+  <button class="bar-btn" id="btn-autolayout" title="Auto-arrange (L)">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+    Layout
+  </button>
+
+  <button class="bar-btn" id="btn-fit" title="Fit to Screen (F)">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
+    Fit
+  </button>
+
+  <div class="bar-divider"></div>
+
+  <button class="bar-btn" id="btn-branches" title="Branch Manager (B)">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M2 12h3M19 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/></svg>
+    Branches
+  </button>
+
+  <button class="bar-btn" id="btn-saves" title="Save Files">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+    Files
+  </button>
+
+  <button class="bar-btn" id="btn-stats" title="Tree Statistics">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+    Stats
+  </button>
+
+  <div class="bar-divider"></div>
+
+  <button class="bar-btn" id="btn-export-menu" title="Export">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+    Export
+  </button>
+
+  <button class="bar-btn" id="btn-import" title="Import JSON">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+    Import
+  </button>
+
+  <button class="bar-btn" id="btn-shortcuts" title="Keyboard Shortcuts (?)">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+  </button>
+</div>
+
+<!-- CONNECTION MODE BANNER -->
+<div id="conn-mode-banner">Click a second person to connect — Esc to cancel</div>
+
+<!-- CANVAS -->
+<div id="canvas-wrap">
+  <div id="canvas">
+    <svg id="svg-layer"></svg>
+  </div>
+</div>
+
+<!-- SIDE PANEL -->
+<div id="side-panel">
+  <div class="panel-header">
+    <div class="panel-title">PERSON DETAILS</div>
+    <button class="panel-close" id="panel-close-btn">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>
+  </div>
+  <div class="panel-body" id="panel-body">
+    <p style="color:var(--text3);font-size:13px;text-align:center;margin-top:40px">Select a person to edit their details.</p>
+  </div>
+</div>
+
+<!-- BRANCH FILTER PILLS -->
+<div id="branch-filters"></div>
+
+<!-- BULK TOOLBAR -->
+<div id="bulk-toolbar">
+  <span class="bulk-label">Selected:</span>
+  <span class="bulk-count" id="bulk-count">0</span>
+  <div class="bulk-divider"></div>
+  <button class="bulk-btn" id="bulk-move-btn">Move Together</button>
+  <button class="bulk-btn" id="bulk-branch-btn">Change Branch</button>
+  <button class="bulk-btn" id="bulk-align-h-btn">Align Horiz.</button>
+  <button class="bulk-btn" id="bulk-align-v-btn">Align Vert.</button>
+  <div class="bulk-divider"></div>
+  <button class="bulk-btn danger" id="bulk-delete-btn">Delete All</button>
+</div>
+
+<!-- EDGE LEGEND -->
+<div id="edge-legend">
+  <div class="legend-row"><div class="legend-line" style="background:rgba(201,169,110,0.6)"></div>Biological</div>
+  <div class="legend-row"><div class="legend-line" style="background:rgba(201,169,110,0.35);border-top:2px dashed rgba(201,169,110,0.35);height:0"></div>Potential</div>
+  <div class="legend-row"><div class="legend-line" style="background:rgba(78,126,201,0.55);border-top:2px dotted rgba(78,126,201,0.55);height:0"></div>Adopted</div>
+  <div class="legend-row"><div class="legend-line" style="background:rgba(255,255,255,0.18)"></div>Spouse</div>
+</div>
+
+<!-- KEYBOARD HINTS -->
+<div id="kb-hints">
+  <div class="kb-hint"><span class="kb-key">A</span> Add person</div>
+  <div class="kb-hint"><span class="kb-key">F</span> Fit to screen</div>
+  <div class="kb-hint"><span class="kb-key">L</span> Auto-layout</div>
+  <div class="kb-hint"><span class="kb-key">Esc</span> Deselect / Cancel</div>
+  <div class="kb-hint"><span class="kb-key">Del</span> Delete selected</div>
+  <div class="kb-hint"><span class="kb-key">Shift+click</span> Multi-select</div>
+</div>
+
+<!-- RUBBER BAND SELECTION -->
+<div id="rubber-band"></div>
+
+<!-- BRANCH COLOR MANAGER MODAL -->
+<div id="branch-modal" class="modal-overlay" style="display:none">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">BRANCH COLOUR MANAGER</div>
+      <button class="modal-close" id="branch-modal-close">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="modal-body" id="branch-modal-body"></div>
+    <div class="modal-footer">
+      <button class="modal-btn" id="branch-modal-add">+ Add Branch</button>
+      <button class="modal-btn primary" id="branch-modal-save">Save Changes</button>
+    </div>
+  </div>
+</div>
+
+<!-- SAVE FILE MANAGER MODAL -->
+<div id="saves-modal" class="modal-overlay" style="display:none">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">SAVE FILE MANAGER</div>
+      <button class="modal-close" id="saves-modal-close">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="modal-body" id="saves-modal-body"></div>
+    <div class="modal-footer">
+      <button class="modal-btn" id="saves-modal-new">+ New Tree</button>
+      <button class="modal-btn primary" id="saves-modal-save-current">Save Current</button>
+    </div>
+  </div>
+</div>
+
+<!-- BULK BRANCH CHANGE MODAL -->
+<div id="bulk-branch-modal" class="modal-overlay" style="display:none">
+  <div class="modal" style="width:340px">
+    <div class="modal-header">
+      <div class="modal-title">CHANGE BRANCH</div>
+      <button class="modal-close" id="bulk-branch-modal-close">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="modal-body" id="bulk-branch-modal-body"></div>
+    <div class="modal-footer">
+      <button class="modal-btn" id="bulk-branch-modal-cancel">Cancel</button>
+      <button class="modal-btn primary" id="bulk-branch-modal-apply">Apply to Selected</button>
+    </div>
+  </div>
+</div>
+
+<!-- ZOOM CONTROLS -->
+<div id="zoom-controls">
+  <button class="zoom-btn" id="btn-zoom-in" title="+">+</button>
+  <div id="zoom-label">100%</div>
+  <button class="zoom-btn" id="btn-zoom-out" title="−">−</button>
+  <button class="zoom-btn" id="btn-zoom-reset" title="Reset" style="font-size:11px;">1:1</button>
+</div>
+
+<!-- MINIMAP -->
+<div id="minimap" title="Overview map">
+  <canvas id="minimap-canvas"></canvas>
+</div>
+
+<!-- STATUS BAR -->
+<div id="statusbar">
+  <div class="status-item"><div class="status-dot"></div>Ready</div>
+  <div class="status-item" id="status-nodes">0 people</div>
+  <div class="status-item" id="status-edges">0 connections</div>
+  <div class="status-item" id="status-gen">0 generations</div>
+  <div class="status-item" id="status-selected" style="margin-left:auto;"></div>
+  <div class="status-item" id="status-save-name" style="color:var(--accent);font-weight:500"></div>
+  <div class="status-item">Lineage v3</div>
+</div>
+
+<!-- TOAST -->
+<div id="toast"></div>
+
+<!-- CONTEXT MENU -->
+<div id="ctx-menu">
+  <div class="ctx-item" id="ctx-edit">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+    Edit Details
+  </div>
+  <div class="ctx-item" id="ctx-connect">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+    Connect To...
+  </div>
+  <div class="ctx-item" id="ctx-path-from">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="6" cy="6" r="3"/><circle cx="18" cy="18" r="3"/><path d="M6 9v3a3 3 0 0 0 3 3h6"/></svg>
+    Find Path From Here
+  </div>
+  <div class="ctx-item" id="ctx-select-branch">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+    Select Entire Branch
+  </div>
+  <div class="ctx-item" id="ctx-ancestors">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="17 11 12 6 7 11"/><polyline points="17 18 12 13 7 18"/></svg>
+    Select Ancestors
+  </div>
+  <div class="ctx-item" id="ctx-descendants">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="7 13 12 18 17 13"/><polyline points="7 6 12 11 17 6"/></svg>
+    Select Descendants
+  </div>
+  <div class="ctx-sep"></div>
+  <div class="ctx-item danger" id="ctx-delete">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+    Delete Person
+  </div>
+</div>
+
+<!-- UNDO/REDO BAR -->
+<div id="undo-redo-bar">
+  <button class="ur-btn" id="btn-undo" disabled title="Undo (Ctrl+Z)">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 14 4 9 9 4"/><path d="M20 20v-7a4 4 0 0 0-4-4H4"/></svg>
+    Undo
+  </button>
+  <button class="ur-btn" id="btn-redo" disabled title="Redo (Ctrl+Y)">
+    Redo
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 14 20 9 15 4"/><path d="M4 20v-7a4 4 0 0 1 4-4h12"/></svg>
+  </button>
+</div>
+
+<!-- STATS PANEL -->
+<div id="stats-panel">
+  <div class="stat-title">TREE STATISTICS</div>
+  <div id="stats-content"></div>
+</div>
+
+<!-- PATH FINDER MODAL -->
+<div id="path-modal" class="modal-overlay" style="display:none">
+  <div class="modal" style="width:560px">
+    <div class="modal-header">
+      <div class="modal-title">RELATIONSHIP PATH FINDER</div>
+      <button class="modal-close" id="path-modal-close">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="modal-body" id="path-modal-body">
+      <p style="font-size:13px;color:var(--text2)">Select two people to discover how they are related.</p>
+      <div style="display:grid;grid-template-columns:1fr auto 1fr;gap:10px;align-items:center">
+        <div class="field-group">
+          <label class="field-label">Person A</label>
+          <select class="field-input" id="path-person-a"><option value="">— Select —</option></select>
+        </div>
+        <div style="color:var(--text3);font-size:18px;padding-top:18px">⟶</div>
+        <div class="field-group">
+          <label class="field-label">Person B</label>
+          <select class="field-input" id="path-person-b"><option value="">— Select —</option></select>
+        </div>
+      </div>
+      <div id="path-result"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="modal-btn" id="path-clear-btn">Clear Highlights</button>
+      <button class="modal-btn primary" id="path-find-btn">Find Relationship</button>
+    </div>
+  </div>
+</div>
+
+<!-- SHORTCUTS MODAL -->
+<div id="shortcuts-modal" class="modal-overlay" style="display:none">
+  <div class="modal" style="width:600px">
+    <div class="modal-header">
+      <div class="modal-title">KEYBOARD SHORTCUTS</div>
+      <button class="modal-close" id="shortcuts-modal-close">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="modal-body">
+      <div class="shortcut-grid">
+        <div class="shortcut-row"><div class="shortcut-keys"><span class="shortcut-key">A</span></div><span class="shortcut-desc">Add new person</span></div>
+        <div class="shortcut-row"><div class="shortcut-keys"><span class="shortcut-key">F</span></div><span class="shortcut-desc">Fit tree to screen</span></div>
+        <div class="shortcut-row"><div class="shortcut-keys"><span class="shortcut-key">L</span></div><span class="shortcut-desc">Auto-layout tree</span></div>
+        <div class="shortcut-row"><div class="shortcut-keys"><span class="shortcut-key">B</span></div><span class="shortcut-desc">Open branch manager</span></div>
+        <div class="shortcut-row"><div class="shortcut-keys"><span class="shortcut-key">P</span></div><span class="shortcut-desc">Path finder</span></div>
+        <div class="shortcut-row"><div class="shortcut-keys"><span class="shortcut-key">G</span></div><span class="shortcut-desc">Toggle generation lanes</span></div>
+        <div class="shortcut-row"><div class="shortcut-keys"><span class="shortcut-key">Esc</span></div><span class="shortcut-desc">Deselect / cancel mode</span></div>
+        <div class="shortcut-row"><div class="shortcut-keys"><span class="shortcut-key">Del</span></div><span class="shortcut-desc">Delete selected</span></div>
+        <div class="shortcut-row"><div class="shortcut-keys"><span class="shortcut-key">Ctrl</span><span class="shortcut-key">Z</span></div><span class="shortcut-desc">Undo</span></div>
+        <div class="shortcut-row"><div class="shortcut-keys"><span class="shortcut-key">Ctrl</span><span class="shortcut-key">Y</span></div><span class="shortcut-desc">Redo</span></div>
+        <div class="shortcut-row"><div class="shortcut-keys"><span class="shortcut-key">Ctrl</span><span class="shortcut-key">S</span></div><span class="shortcut-desc">Save current tree</span></div>
+        <div class="shortcut-row"><div class="shortcut-keys"><span class="shortcut-key">Ctrl</span><span class="shortcut-key">A</span></div><span class="shortcut-desc">Select all nodes</span></div>
+        <div class="shortcut-row"><div class="shortcut-keys"><span class="shortcut-key">Shift</span><span class="shortcut-key">Click</span></div><span class="shortcut-desc">Multi-select nodes</span></div>
+        <div class="shortcut-row"><div class="shortcut-keys"><span class="shortcut-key">Shift</span><span class="shortcut-key">Drag</span></div><span class="shortcut-desc">Rubber-band select</span></div>
+        <div class="shortcut-row"><div class="shortcut-keys"><span class="shortcut-key">Scroll</span></div><span class="shortcut-desc">Zoom in / out</span></div>
+        <div class="shortcut-row"><div class="shortcut-keys"><span class="shortcut-key">Drag canvas</span></div><span class="shortcut-desc">Pan the view</span></div>
+        <div class="shortcut-row"><div class="shortcut-keys"><span class="shortcut-key">Right-click edge</span></div><span class="shortcut-desc">Delete connection</span></div>
+        <div class="shortcut-row"><div class="shortcut-keys"><span class="shortcut-key">?</span></div><span class="shortcut-desc">Show this reference</span></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="modal-btn primary" id="shortcuts-modal-close2">Got it</button>
+    </div>
+  </div>
+</div>
+
+<!-- EXPORT OVERLAY -->
+<div id="export-overlay">
+  <div class="export-box">
+    <div class="export-title">EXPORT TREE</div>
+    <div class="export-options">
+      <button class="export-option-btn" id="export-json">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+        <div>
+          <div>Export as JSON</div>
+          <span class="export-option-desc">Full data backup — re-importable</span>
+        </div>
+      </button>
+      <button class="export-option-btn" id="export-png">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+        <div>
+          <div>Export as PNG Image</div>
+          <span class="export-option-desc">High-resolution snapshot of the canvas</span>
+        </div>
+      </button>
+      <button class="export-option-btn" id="export-print">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+        <div>
+          <div>Print / Save as PDF</div>
+          <span class="export-option-desc">Opens the browser print dialog</span>
+        </div>
+      </button>
+    </div>
+    <button class="modal-btn" id="export-cancel">Cancel</button>
+  </div>
+</div>
+
+<!-- HIDDEN FILE INPUTS -->
+<input type="file" id="file-import" accept=".json" style="display:none">
+<input type="file" id="file-img" accept="image/*" style="display:none">
+
+<script>
+// ═══════════════════════════════════════════════════════════
+//  LINEAGE — Family Tree Manager  |  Part 3 (Final)
+//  New: Undo/Redo, Path Finder, Generation Lanes & Badges,
+//       Tree Statistics, PNG Export, Shortcuts Modal,
+//       Ancestor/Descendant Selection, Notes Popover,
+//       Polished UX, Generation depth in status bar
+// ═══════════════════════════════════════════════════════════
+
+const BRANCH_COLORS = [
+  '#c9a96e','#c94e4e','#4e7ec9','#4ec97a','#c94ec9',
+  '#c9c94e','#4ec9c9','#e8834a','#9b72cf','#cf7272',
+  '#7ab648','#4a90d9','#e06b9a','#5bc0be','#e8c84a',
+  '#d4845a','#6bbfa0','#a76bcf','#cfb66b','#6ba8cf'
+];
+
+const DEFAULT_BRANCHES = [
+  { id: 'targaryen', name: 'House Targaryen', color: '#c94e4e' },
+  { id: 'stark',     name: 'House Stark',     color: '#6699cc' },
+  { id: 'lannister', name: 'House Lannister',  color: '#c9a94e' },
+  { id: 'baratheon', name: 'House Baratheon',  color: '#8b6e3f' },
+  { id: 'martell',   name: 'House Martell',    color: '#e8834a' },
+  { id: 'tyrell',    name: 'House Tyrell',     color: '#4ec97a' },
+];
+
+// ── STATE ──────────────────────────────────────────────────
+let state = {
+  nodes: [], edges: [],
+  branches: JSON.parse(JSON.stringify(DEFAULT_BRANCHES)),
+  camera: { x: 100, y: 80, scale: 1 },
+  selectedIds: new Set(),
+  activeBranchFilter: null,
+  activeSave: 'default',
+  showGenLanes: false,
+  showGenBadges: false,
+};
+
+// ── UNDO/REDO ──────────────────────────────────────────────
+const undoStack = [];
+const redoStack = [];
+const MAX_UNDO  = 50;
+
+function snapshot() {
+  const snap = JSON.stringify({ nodes: state.nodes, edges: state.edges, branches: state.branches });
+  if (undoStack.length && undoStack[undoStack.length - 1] === snap) return;
+  undoStack.push(snap);
+  if (undoStack.length > MAX_UNDO) undoStack.shift();
+  redoStack.length = 0;
+  updateUndoRedoBtns();
+}
+
+function undo() {
+  if (!undoStack.length) return;
+  const current = JSON.stringify({ nodes: state.nodes, edges: state.edges, branches: state.branches });
+  redoStack.push(current);
+  const prev = undoStack.pop();
+  const d = JSON.parse(prev);
+  state.nodes = d.nodes; state.edges = d.edges; state.branches = d.branches;
+  state.selectedIds.clear();
+  fullRender(); applyCamera(); updateUndoRedoBtns();
+  showToast('Undo');
+}
+
+function redo() {
+  if (!redoStack.length) return;
+  const current = JSON.stringify({ nodes: state.nodes, edges: state.edges, branches: state.branches });
+  undoStack.push(current);
+  const next = redoStack.pop();
+  const d = JSON.parse(next);
+  state.nodes = d.nodes; state.edges = d.edges; state.branches = d.branches;
+  state.selectedIds.clear();
+  fullRender(); applyCamera(); updateUndoRedoBtns();
+  showToast('Redo');
+}
+
+function updateUndoRedoBtns() {
+  document.getElementById('btn-undo').disabled = !undoStack.length;
+  document.getElementById('btn-redo').disabled = !redoStack.length;
+}
+
+document.getElementById('btn-undo').addEventListener('click', undo);
+document.getElementById('btn-redo').addEventListener('click', redo);
+
+// ── UTILS ──────────────────────────────────────────────────
+let uid = () => Math.random().toString(36).slice(2, 9);
+function escHtml(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── DOM REFS ───────────────────────────────────────────────
+const canvasWrap     = document.getElementById('canvas-wrap');
+const canvas         = document.getElementById('canvas');
+const svgLayer       = document.getElementById('svg-layer');
+const sidePanel      = document.getElementById('side-panel');
+const panelBody      = document.getElementById('panel-body');
+const toast          = document.getElementById('toast');
+const ctxMenu        = document.getElementById('ctx-menu');
+const searchInput    = document.getElementById('search-input');
+const branchFilters  = document.getElementById('branch-filters');
+const zoomLabel      = document.getElementById('zoom-label');
+const statusNodes    = document.getElementById('status-nodes');
+const statusEdges    = document.getElementById('status-edges');
+const statusGen      = document.getElementById('status-gen');
+const statusSelected = document.getElementById('status-selected');
+const statusSaveName = document.getElementById('status-save-name');
+const connBanner     = document.getElementById('conn-mode-banner');
+const minimapCanvas  = document.getElementById('minimap-canvas');
+const bulkToolbar    = document.getElementById('bulk-toolbar');
+const bulkCount      = document.getElementById('bulk-count');
+const rubberBand     = document.getElementById('rubber-band');
+
+// ── CAMERA ─────────────────────────────────────────────────
+function applyCamera() {
+  canvas.style.transform   = `translate(${state.camera.x}px,${state.camera.y}px) scale(${state.camera.scale})`;
+  svgLayer.style.transform = `translate(${state.camera.x}px,${state.camera.y}px) scale(${state.camera.scale})`;
+  zoomLabel.textContent = Math.round(state.camera.scale * 100) + '%';
+  renderMinimap();
+}
+function screenToWorld(x, y) {
+  return { x: (x - state.camera.x) / state.camera.scale, y: (y - state.camera.y) / state.camera.scale };
+}
+
+// ── NODE DIMS ──────────────────────────────────────────────
+const NODE_W = 148, NODE_H = 192;
+
+function getBranchById(id) { return state.branches.find(b => b.id === id); }
+function getInitials(name) {
+  if (!name) return '?';
+  return name.split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase();
+}
+
+// ── GENERATION DEPTH CALC ──────────────────────────────────
+function calcGenerations() {
+  const depths = {};
+  const parents = {};
+  state.nodes.forEach(n => { parents[n.id] = []; });
+  state.edges.forEach(e => {
+    if (e.type === 'spouse') return;
+    if (!parents[e.to]) parents[e.to] = [];
+    parents[e.to].push(e.from);
+  });
+  const roots = state.nodes.filter(n => !(parents[n.id]||[]).length).map(n => n.id);
+  if (!roots.length && state.nodes.length) roots.push(state.nodes[0].id);
+  const queue = roots.map(id => ({ id, d: 0 }));
+  const visited = new Set();
+  while (queue.length) {
+    const { id, d } = queue.shift();
+    if (visited.has(id)) continue;
+    visited.add(id);
+    depths[id] = Math.max(depths[id]||0, d);
+    state.edges.forEach(e => {
+      if (e.type === 'spouse') return;
+      if (e.from === id && !visited.has(e.to)) queue.push({ id: e.to, d: d+1 });
+    });
+  }
+  state.nodes.forEach(n => { if (depths[n.id] === undefined) depths[n.id] = 0; });
+  return depths;
+}
+
+// ── NODE HTML ──────────────────────────────────────────────
+function buildNodeHTML(node, genDepth) {
+  const branch = getBranchById(node.branchId);
+  const branchColor = branch ? branch.color : '#666';
+  const genBadge = (state.showGenBadges && genDepth !== undefined)
+    ? `<div class="node-gen-badge">Gen ${genDepth + 1}</div>` : '';
+  return `
+    ${genBadge}
+    <div class="node-branch-bar" style="background:${branchColor}"></div>
+    <div class="node-img-wrap">
+      ${node.imageUrl ? `<img src="${escHtml(node.imageUrl)}" alt="${escHtml(node.name)}" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">` : ''}
+      <div class="node-avatar-placeholder" style="${node.imageUrl?'display:none':''}">${getInitials(node.name)}</div>
+    </div>
+    <div class="node-info">
+      <div class="node-name" title="${escHtml(node.name||'Unknown')}">${escHtml(node.name||'Unknown')}</div>
+      <div class="node-branch-label" style="color:${branchColor}">${escHtml(branch?branch.name:'No Branch')}</div>
+      ${node.born||node.died ? `<div class="node-dates">${escHtml(node.born||'?')} – ${escHtml(node.died||'present')}</div>` : ''}
+      <div class="node-badge-row">
+        ${node.gender ? `<span class="node-badge">${escHtml(node.gender)}</span>` : ''}
+        ${node.title  ? `<span class="node-badge" title="${escHtml(node.title)}">${escHtml(node.title.length>12?node.title.slice(0,12)+'…':node.title)}</span>` : ''}
+      </div>
+    </div>
+    <div class="node-actions">
+      <button class="node-action-btn" data-action="edit" title="Edit">✎</button>
+      <button class="node-action-btn" data-action="connect" title="Connect">⊕</button>
+      ${node.notes ? `<button class="node-action-btn" data-action="notes" title="Notes">📝</button>` : ''}
+    </div>
+    ${node.linkUrl ? '<div class="node-link-dot" title="Has linked page"></div>' : ''}
+  `;
+}
+
+function createNodeEl(node, depths) {
+  const el = document.createElement('div');
+  el.className = 'node';
+  el.id = 'node-' + node.id;
+  el.dataset.id = node.id;
+  el.style.left = node.x + 'px';
+  el.style.top  = node.y + 'px';
+  el.style.zIndex = node.zIndex || 1;
+  el.innerHTML = buildNodeHTML(node, depths ? depths[node.id] : undefined);
+  if (state.selectedIds.has(node.id)) el.classList.add('selected');
+  attachNodeEvents(el, node);
+  canvas.appendChild(el);
+  return el;
+}
+
+function updateNodeEl(node) {
+  const el = document.getElementById('node-' + node.id);
+  if (!el) return;
+  el.style.left = node.x + 'px';
+  el.style.top  = node.y + 'px';
+  const depths = calcGenerations();
+  el.innerHTML = buildNodeHTML(node, depths[node.id]);
+  if (state.selectedIds.has(node.id)) el.classList.add('selected');
+  attachNodeEvents(el, node);
+}
+
+function removeNodeEl(id) {
+  const el = document.getElementById('node-'+id);
+  if (el) el.remove();
+}
+
+function renderAllNodes() {
+  canvas.querySelectorAll('.node').forEach(el => el.remove());
+  canvas.querySelectorAll('.gen-lane,.gen-lane-label').forEach(el => el.remove());
+  const depths = calcGenerations();
+  if (state.showGenLanes) renderGenLanes(depths);
+  state.nodes.forEach(n => createNodeEl(n, depths));
+}
+
+// ── GENERATION LANES ───────────────────────────────────────
+function renderGenLanes(depths) {
+  if (!state.nodes.length) return;
+  const byGen = {};
+  state.nodes.forEach(n => {
+    const d = depths[n.id] || 0;
+    byGen[d] = byGen[d] || [];
+    byGen[d].push(n);
+  });
+  const genNums = Object.keys(byGen).map(Number).sort((a,b)=>a-b);
+  const laneColors = ['rgba(201,169,110,0.03)','rgba(78,126,201,0.03)','rgba(78,201,122,0.03)',
+    'rgba(201,78,78,0.03)','rgba(201,78,201,0.03)','rgba(201,201,78,0.03)'];
+
+  genNums.forEach((gen, i) => {
+    const nodes = byGen[gen];
+    const minY = Math.min(...nodes.map(n=>n.y)) - 20;
+    const maxY = Math.max(...nodes.map(n=>n.y+NODE_H)) + 20;
+    const lane = document.createElement('div');
+    lane.className = 'gen-lane';
+    lane.style.top    = minY + 'px';
+    lane.style.height = (maxY - minY) + 'px';
+    lane.style.background = laneColors[i % laneColors.length];
+    canvas.insertBefore(lane, canvas.firstChild);
+
+    const label = document.createElement('div');
+    label.className = 'gen-lane-label';
+    label.textContent = `Generation ${gen + 1}`;
+    label.style.top = (minY + 8) + 'px';
+    label.style.left = '8px';
+    canvas.insertBefore(label, canvas.firstChild);
+  });
+}
+
+// ── EDGE RENDERING ─────────────────────────────────────────
+function getEdgeClass(type) {
+  const m = { biological:'edge-bio', potential:'edge-potential', adopted:'edge-adopted', spouse:'edge-spouse' };
+  return m[type] || 'edge-bio';
+}
+
+function buildEdgePath(n1, n2, type) {
+  const c1x=n1.x+NODE_W/2, c1y=n1.y+NODE_H/2;
+  const c2x=n2.x+NODE_W/2, c2y=n2.y+NODE_H/2;
+  const dx=c2x-c1x, dy=c2y-c1y;
+
+  if (type === 'spouse') {
+    const x1 = dx>=0 ? n1.x+NODE_W : n1.x;
+    const x2 = dx>=0 ? n2.x        : n2.x+NODE_W;
+    const y1 = n1.y+NODE_H*0.35, y2 = n2.y+NODE_H*0.35;
+    const mx = (x1+x2)/2;
+    return `M${x1},${y1} C${mx},${y1} ${mx},${y2} ${x2},${y2}`;
+  }
+
+  let x1,y1,x2,y2;
+  const adx=Math.abs(dx), ady=Math.abs(dy);
+  if (ady > adx*0.7) {
+    if (dy>0){x1=c1x;y1=n1.y+NODE_H;x2=c2x;y2=n2.y;}
+    else     {x1=c1x;y1=n1.y;        x2=c2x;y2=n2.y+NODE_H;}
+  } else if (adx > ady*0.7) {
+    if (dx>0){x1=n1.x+NODE_W;y1=c1y;x2=n2.x;        y2=c2y;}
+    else     {x1=n1.x;        y1=c1y;x2=n2.x+NODE_W; y2=c2y;}
+  } else {
+    if (dy>0){x1=c1x;y1=n1.y+NODE_H;x2=c2x;y2=n2.y;}
+    else     {x1=c1x;y1=n1.y;        x2=c2x;y2=n2.y+NODE_H;}
+  }
+  const midY=(y1+y2)/2;
+  return Math.abs(x1-x2)<20 ? `M${x1},${y1} L${x2},${y2}`
+    : `M${x1},${y1} C${x1},${midY} ${x2},${midY} ${x2},${y2}`;
+}
+
+function renderEdges(highlightEdgeIds) {
+  svgLayer.innerHTML = '';
+  state.edges.forEach(edge => {
+    const n1=state.nodes.find(n=>n.id===edge.from);
+    const n2=state.nodes.find(n=>n.id===edge.to);
+    if (!n1||!n2) return;
+    const d = buildEdgePath(n1,n2,edge.type);
+
+    // Invisible wide hit area
+    const hit = document.createElementNS('http://www.w3.org/2000/svg','path');
+    hit.setAttribute('d',d);
+    hit.style.stroke='transparent'; hit.style.strokeWidth='14';
+    hit.style.fill='none'; hit.style.cursor='pointer';
+    hit.setAttribute('pointer-events','stroke');
+    hit.addEventListener('contextmenu', e => {
+      e.preventDefault();
+      if(confirm(`Remove connection between ${n1.name} and ${n2.name}?`)) { snapshot(); deleteEdge(edge.id); }
+    });
+    svgLayer.appendChild(hit);
+
+    const path = document.createElementNS('http://www.w3.org/2000/svg','path');
+    path.setAttribute('d',d);
+    const cls = getEdgeClass(edge.type);
+    path.setAttribute('class', highlightEdgeIds && highlightEdgeIds.has(edge.id)
+      ? cls + ' edge-path-highlight' : cls);
+    path.dataset.edgeId = edge.id;
+    svgLayer.appendChild(path);
+  });
+}
+
+function fullRender(highlightEdgeIds) {
+  renderAllNodes();
+  renderEdges(highlightEdgeIds);
+  renderBranchPills();
+  updateStatus();
+  updateBulkToolbar();
+  renderMinimap();
+}
+
+// ── DRAG SYSTEM ─────────────────────────────────────────────
+let dragState=null, canvasDrag=null, rubberState=null;
+
+function attachNodeEvents(el, node) {
+  el.addEventListener('mousedown', e => {
+    if (e.button!==0) return;
+    e.stopPropagation();
+
+    const btn = e.target.closest('.node-action-btn');
+    if (btn) {
+      const a = btn.dataset.action;
+      if (a==='edit')    openPanel(node.id);
+      if (a==='connect') enterConnectMode(node.id);
+      if (a==='notes')   showNotesPopover(node, btn);
+      return;
+    }
+    if (connectMode.active) { handleConnectClick(node.id); return; }
+
+    const was = state.selectedIds.has(node.id);
+    if (!e.shiftKey && !was) clearSelection();
+    if (e.shiftKey) { if(was) state.selectedIds.delete(node.id); else state.selectedIds.add(node.id); }
+    else { if (!was) { state.selectedIds.clear(); state.selectedIds.add(node.id); } }
+    updateSelectionVisuals();
+
+    const world = screenToWorld(e.clientX, e.clientY);
+    const offsets = {};
+    state.selectedIds.forEach(id => {
+      const n = state.nodes.find(x=>x.id===id);
+      if (n) offsets[id] = { dx: world.x-n.x, dy: world.y-n.y };
+    });
+    dragState = { offsets, moved:false, startSnap: JSON.stringify({nodes:state.nodes,edges:state.edges,branches:state.branches}) };
+    el.classList.add('dragging');
+  });
+
+  el.addEventListener('click', e => {
+    if (e.target.closest('.node-action-btn')) return;
+    e.stopPropagation();
+    if (!dragState||!dragState.moved) openPanel(node.id);
+  });
+
+  el.addEventListener('contextmenu', e => {
+    e.preventDefault(); e.stopPropagation();
+    if (!state.selectedIds.has(node.id)) { clearSelection(); state.selectedIds.add(node.id); updateSelectionVisuals(); }
+    showCtxMenu(e.clientX, e.clientY, node.id);
+  });
+
+  // Notes popover on double-click
+  el.addEventListener('dblclick', e => {
+    e.stopPropagation();
+    if (node.notes) showNotesPopover(node, el);
+    else openPanel(node.id);
+  });
+}
+
+document.addEventListener('mousemove', e => {
+  if (dragState) {
+    const world = screenToWorld(e.clientX, e.clientY);
+    dragState.moved = true;
+    state.selectedIds.forEach(id => {
+      const n=state.nodes.find(x=>x.id===id);
+      const off=dragState.offsets[id];
+      if(n&&off){n.x=world.x-off.dx;n.y=world.y-off.dy;
+        const el=document.getElementById('node-'+id);
+        if(el){el.style.left=n.x+'px';el.style.top=n.y+'px';}}
+    });
+    renderEdges(); renderMinimap(); return;
+  }
+  if (canvasDrag) {
+    state.camera.x+=e.clientX-canvasDrag.lastX;
+    state.camera.y+=e.clientY-canvasDrag.lastY;
+    canvasDrag.lastX=e.clientX; canvasDrag.lastY=e.clientY;
+    applyCamera(); return;
+  }
+  if (rubberState) {
+    const x=Math.min(e.clientX,rubberState.startX), y=Math.min(e.clientY,rubberState.startY);
+    const w=Math.abs(e.clientX-rubberState.startX), h=Math.abs(e.clientY-rubberState.startY);
+    rubberBand.style.cssText=`left:${x}px;top:${y}px;width:${w}px;height:${h}px;display:block`;
+    const wr=canvasWrap.getBoundingClientRect();
+    const r={
+      x1:(x-wr.left-state.camera.x)/state.camera.scale,
+      y1:(y-wr.top-state.camera.y)/state.camera.scale,
+      x2:(x+w-wr.left-state.camera.x)/state.camera.scale,
+      y2:(y+h-wr.top-state.camera.y)/state.camera.scale,
+    };
+    state.selectedIds.clear();
+    state.nodes.forEach(n=>{
+      if(n.x+NODE_W/2>=r.x1&&n.x+NODE_W/2<=r.x2&&n.y+NODE_H/2>=r.y1&&n.y+NODE_H/2<=r.y2)
+        state.selectedIds.add(n.id);
+    });
+    updateSelectionVisuals();
+  }
+});
+
+document.addEventListener('mouseup', () => {
+  if (dragState) {
+    canvas.querySelectorAll('.node.dragging').forEach(el=>el.classList.remove('dragging'));
+    if (dragState.moved) { undoStack.push(dragState.startSnap); redoStack.length=0; updateUndoRedoBtns(); autosave(); updateBulkToolbar(); if(state.showGenLanes)fullRender(); }
+    dragState=null;
+  }
+  if (canvasDrag) canvasDrag=null;
+  if (rubberState) { rubberBand.style.display='none'; rubberState=null; updateBulkToolbar(); }
+});
+
+canvasWrap.addEventListener('mousedown', e => {
+  if (e.target===canvasWrap||e.target===canvas||e.target===svgLayer) {
+    if (e.button===0) {
+      if (connectMode.active) return;
+      hideCtxMenu(); closeNotesPopover();
+      if (e.shiftKey) { rubberState={startX:e.clientX,startY:e.clientY}; }
+      else { canvasDrag={lastX:e.clientX,lastY:e.clientY}; clearSelection(); updateSelectionVisuals(); closePanelIfEmpty(); }
+    }
+  }
+});
+
+canvasWrap.addEventListener('wheel', e => {
+  e.preventDefault();
+  const delta=e.deltaY>0?0.9:1.1;
+  const rect=canvasWrap.getBoundingClientRect();
+  const mx=e.clientX-rect.left, my=e.clientY-rect.top;
+  const ns=Math.min(3,Math.max(0.1,state.camera.scale*delta));
+  state.camera.x=mx-(mx-state.camera.x)*(ns/state.camera.scale);
+  state.camera.y=my-(my-state.camera.y)*(ns/state.camera.scale);
+  state.camera.scale=ns; applyCamera();
+},{passive:false});
+
+// ── SELECTION ──────────────────────────────────────────────
+function clearSelection() { state.selectedIds.clear(); updateSelectionVisuals(); }
+
+function updateSelectionVisuals() {
+  canvas.querySelectorAll('.node').forEach(el=>{
+    if(state.selectedIds.has(el.dataset.id)) el.classList.add('selected');
+    else el.classList.remove('selected');
+  });
+  const c=state.selectedIds.size;
+  statusSelected.textContent=c>0?`${c} selected`:'';
+  updateBulkToolbar();
+}
+
+function updateBulkToolbar() {
+  const c=state.selectedIds.size;
+  bulkToolbar.classList.toggle('visible',c>1);
+  bulkCount.textContent=c;
+}
+
+// ── ANCESTOR / DESCENDANT SELECTION ───────────────────────
+function getAncestors(nodeId) {
+  const result=new Set(); const queue=[nodeId];
+  while(queue.length){
+    const id=queue.shift();
+    state.edges.forEach(e=>{
+      if(e.type==='spouse') return;
+      if(e.to===id&&!result.has(e.from)){result.add(e.from);queue.push(e.from);}
+    });
+  }
+  return result;
+}
+
+function getDescendants(nodeId) {
+  const result=new Set(); const queue=[nodeId];
+  while(queue.length){
+    const id=queue.shift();
+    state.edges.forEach(e=>{
+      if(e.type==='spouse') return;
+      if(e.from===id&&!result.has(e.to)){result.add(e.to);queue.push(e.to);}
+    });
+  }
+  return result;
+}
+
+// ── CONNECT MODE ───────────────────────────────────────────
+const connectMode={active:false,fromId:null,type:'biological'};
+
+function enterConnectMode(fromId,type='biological'){
+  connectMode.active=true; connectMode.fromId=fromId; connectMode.type=type;
+  connBanner.style.display='block'; canvasWrap.style.cursor='crosshair';
+  showToast(`Click target — ${type} link`);
+}
+function exitConnectMode(){
+  connectMode.active=false; connectMode.fromId=null;
+  connBanner.style.display='none'; canvasWrap.style.cursor='';
+}
+function handleConnectClick(toId){
+  if(!connectMode.fromId||toId===connectMode.fromId){exitConnectMode();return;}
+  const exists=state.edges.find(e=>(e.from===connectMode.fromId&&e.to===toId)||(e.from===toId&&e.to===connectMode.fromId));
+  if(exists){showToast('Connection already exists');exitConnectMode();return;}
+  snapshot(); addEdge(connectMode.fromId,toId,connectMode.type); exitConnectMode();
+  showToast('Connection added');
+}
+
+// ── ADD / DELETE ───────────────────────────────────────────
+function addNode(opts={}) {
+  const wr=canvasWrap.getBoundingClientRect();
+  const c=screenToWorld(wr.width/2+(Math.random()-.5)*200,wr.height/2+(Math.random()-.5)*200);
+  const node={
+    id:uid(), name:opts.name||'New Person',
+    branchId:opts.branchId||(state.branches[0]?state.branches[0].id:null),
+    x:opts.x!==undefined?opts.x:c.x, y:opts.y!==undefined?opts.y:c.y,
+    imageUrl:opts.imageUrl||'', linkUrl:opts.linkUrl||'',
+    born:opts.born||'', died:opts.died||'',
+    gender:opts.gender||'', title:opts.title||'', notes:opts.notes||'',
+    zIndex:state.nodes.length+1,
+  };
+  snapshot();
+  state.nodes.push(node);
+  const depths=calcGenerations();
+  createNodeEl(node,depths);
+  updateStatus(); renderMinimap(); autosave();
+  clearSelection(); state.selectedIds.add(node.id); updateSelectionVisuals();
+  openPanel(node.id);
+  return node;
+}
+
+function deleteNode(id){
+  snapshot();
+  state.nodes=state.nodes.filter(n=>n.id!==id);
+  state.edges=state.edges.filter(e=>e.from!==id&&e.to!==id);
+  removeNodeEl(id); renderEdges(); updateStatus(); autosave();
+  closePanel(); clearSelection(); updateSelectionVisuals();
+}
+
+function addEdge(from,to,type='biological'){
+  const edge={id:uid(),from,to,type};
+  state.edges.push(edge); renderEdges(); updateStatus(); autosave();
+  return edge;
+}
+function deleteEdge(id){
+  state.edges=state.edges.filter(e=>e.id!==id);
+  renderEdges(); updateStatus(); autosave();
+  if(panelNodeId) renderPanel(panelNodeId);
+}
+
+// ── PANEL ──────────────────────────────────────────────────
+let panelNodeId=null;
+function openPanel(id){ panelNodeId=id; sidePanel.classList.add('open'); renderPanel(id); }
+function closePanel(){ panelNodeId=null; sidePanel.classList.remove('open'); }
+function closePanelIfEmpty(){ if(!state.selectedIds.size) closePanel(); }
+document.getElementById('panel-close-btn').addEventListener('click',closePanel);
+
+function renderPanel(nodeId){
+  const node=state.nodes.find(n=>n.id===nodeId);
+  if(!node){panelBody.innerHTML='<p style="color:var(--text3);font-size:13px;text-align:center;margin-top:40px">Not found.</p>';return;}
+  const nodeEdges=state.edges.filter(e=>e.from===nodeId||e.to===nodeId);
+  const typeColors={biological:'#c9a96e',adopted:'#4e7ec9',potential:'#888',spouse:'#ccc'};
+  const relHtml=nodeEdges.map(e=>{
+    const otherId=e.from===nodeId?e.to:e.from;
+    const other=state.nodes.find(n=>n.id===otherId);
+    return `<div class="rel-item">
+      <div><div class="rel-name">${escHtml(other?other.name:'Unknown')}</div>
+      <div class="rel-type" style="color:${typeColors[e.type]||'#888'}">${e.type}</div></div>
+      <button class="rel-del" data-edge="${e.id}" title="Remove">×</button></div>`;
+  }).join('');
+  const linkDomain=node.linkUrl?(() => { try{return new URL(node.linkUrl).hostname.replace('www.','')}catch(e){return node.linkUrl} })():'';
+
+  // Relationship description to selected other node
+  let howRelated='';
+  const otherId=[...state.selectedIds].find(id=>id!==nodeId);
+  if(otherId){
+    const path=findPath(nodeId,otherId);
+    if(path){
+      const rel=describeRelationship(path);
+      howRelated=`<div class="field-group"><label class="field-label">Relation to ${escHtml(state.nodes.find(n=>n.id===otherId)?.name||'')}</label><div class="relation-how">${escHtml(rel)}</div></div>`;
+    }
+  }
+
+  panelBody.innerHTML=`
+    <div class="img-preview-wrap" id="img-preview" title="Click to upload image">
+      ${node.imageUrl?`<img src="${escHtml(node.imageUrl)}" alt="preview" onerror="this.style.display='none'">`:`<div class="img-preview-hint">📷 Click to upload<br><span style="font-size:10px;color:var(--text3)">or paste URL below</span></div>`}
+    </div>
+    ${howRelated}
+    <div class="panel-section-title">Identity</div>
+    <div class="field-group"><label class="field-label">Full Name</label><input class="field-input" id="pf-name" type="text" value="${escHtml(node.name||'')}"></div>
+    <div class="field-group"><label class="field-label">Title / Role</label><input class="field-input" id="pf-title" type="text" value="${escHtml(node.title||'')}"></div>
+    <div class="field-group"><label class="field-label">Gender</label>
+      <select class="field-input" id="pf-gender">
+        <option value="" ${!node.gender?'selected':''}>— unspecified —</option>
+        <option value="Male"   ${node.gender==='Male'  ?'selected':''}>Male</option>
+        <option value="Female" ${node.gender==='Female'?'selected':''}>Female</option>
+        <option value="Other"  ${node.gender==='Other' ?'selected':''}>Other</option>
+      </select></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+      <div class="field-group"><label class="field-label">Born</label><input class="field-input" id="pf-born" type="text" value="${escHtml(node.born||'')}"></div>
+      <div class="field-group"><label class="field-label">Died</label><input class="field-input" id="pf-died" type="text" value="${escHtml(node.died||'')}"></div>
+    </div>
+    <div class="panel-section-title">Branch</div>
+    <div class="field-group"><label class="field-label">Branch / House</label>
+      <select class="field-input" id="pf-branch">
+        <option value="">— no branch —</option>
+        ${state.branches.map(b=>`<option value="${b.id}" ${node.branchId===b.id?'selected':''}>${escHtml(b.name)}</option>`).join('')}
+      </select></div>
+    <div class="panel-section-title">Media & Links</div>
+    <div class="field-group"><label class="field-label">Image URL</label><input class="field-input" id="pf-img" type="text" value="${escHtml(node.imageUrl&&!node.imageUrl.startsWith('data:')?node.imageUrl:'')}" placeholder="https://..."></div>
+    <div class="field-group"><label class="field-label">Biography Link</label><input class="field-input" id="pf-link" type="text" value="${escHtml(node.linkUrl||'')}" placeholder="https://en.wikipedia.org/..."></div>
+    ${node.linkUrl?`<div class="link-preview-card"><div class="link-preview-domain">🔗 ${escHtml(linkDomain)}</div>${!node.imageUrl?'<button class="link-auto-img-btn" id="pf-auto-img">Auto-fetch image</button>':''}<button class="link-preview-open" id="pf-open-link">Open ↗</button></div>`:''}
+    <div class="panel-section-title">Notes</div>
+    <div class="field-group"><textarea class="field-input" id="pf-notes" rows="3" placeholder="Additional details...">${escHtml(node.notes||'')}</textarea></div>
+    <div class="panel-section-title">Connections (${nodeEdges.length})</div>
+    <div class="rel-list">${relHtml||'<div style="color:var(--text3);font-size:12px;padding:4px 0">No connections yet</div>'}</div>
+    <div class="field-group"><label class="field-label">Add Connection</label>
+      <div class="add-rel-row">
+        <select class="field-input" id="pf-conn-type" style="flex:0 0 110px">
+          <option value="biological">Biological</option>
+          <option value="adopted">Adopted</option>
+          <option value="potential">Potential</option>
+          <option value="spouse">Spouse</option>
+        </select>
+        <button class="add-rel-btn" id="pf-add-conn-btn">Connect…</button>
+      </div></div>
+    <div class="panel-action-row"><button class="panel-btn danger" id="pf-delete">Delete Person</button></div>
+    <div style="height:8px"></div>`;
+
+  ['name','title','gender','born','died','branch','img','link','notes'].forEach(f=>{
+    const el=document.getElementById('pf-'+f);
+    if(!el) return;
+    el.addEventListener('input',()=>updateNodeFromPanel(nodeId));
+    el.addEventListener('change',()=>updateNodeFromPanel(nodeId));
+  });
+  document.getElementById('img-preview').addEventListener('click',()=>document.getElementById('file-img').click());
+  document.getElementById('file-img').onchange=e=>{
+    const file=e.target.files[0];if(!file)return;
+    const r=new FileReader();
+    r.onload=ev=>{node.imageUrl=ev.target.result;document.getElementById('pf-img').value='';updateNodeEl(node);renderPanel(nodeId);autosave();};
+    r.readAsDataURL(file); e.target.value='';
+  };
+  if(document.getElementById('pf-open-link')) document.getElementById('pf-open-link').addEventListener('click',()=>node.linkUrl&&window.open(node.linkUrl,'_blank'));
+  if(document.getElementById('pf-auto-img'))  document.getElementById('pf-auto-img').addEventListener('click',()=>autoFetchImage(node,nodeId));
+  panelBody.querySelectorAll('.rel-del').forEach(btn=>btn.addEventListener('click',()=>{snapshot();deleteEdge(btn.dataset.edge);renderPanel(nodeId);}));
+  document.getElementById('pf-add-conn-btn').addEventListener('click',()=>enterConnectMode(nodeId,document.getElementById('pf-conn-type').value));
+  document.getElementById('pf-delete').addEventListener('click',()=>{if(confirm(`Delete "${node.name}"?`))deleteNode(nodeId);});
+}
+
+function updateNodeFromPanel(nodeId){
+  const node=state.nodes.find(n=>n.id===nodeId);if(!node)return;
+  const get=id=>{const el=document.getElementById(id);return el?el.value:'';};
+  node.name=get('pf-name'); node.title=get('pf-title'); node.gender=get('pf-gender');
+  node.born=get('pf-born'); node.died=get('pf-died'); node.branchId=get('pf-branch');
+  const iv=get('pf-img'); if(iv) node.imageUrl=iv;
+  node.linkUrl=get('pf-link'); node.notes=get('pf-notes');
+  updateNodeEl(node); renderEdges(); renderBranchPills(); autosave();
+}
+
+// ── AUTO-IMAGE FETCH ────────────────────────────────────────
+function autoFetchImage(node,nodeId){
+  const wikiMatch=(node.linkUrl||'').match(/en\.wikipedia\.org\/wiki\/(.+)/);
+  if(wikiMatch){
+    showToast('Fetching Wikipedia image…');
+    fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(decodeURIComponent(wikiMatch[1]).replace(/ /g,'_'))}`)
+      .then(r=>r.json()).then(d=>{
+        if(d.thumbnail?.source){node.imageUrl=d.thumbnail.source;updateNodeEl(node);renderPanel(nodeId);autosave();showToast('Image fetched');}
+        else showToast('No image on that Wikipedia page');
+      }).catch(()=>showToast('Fetch failed — paste image URL manually'));
+    return;
+  }
+  const m=prompt('Paste a direct image URL:','');
+  if(m){node.imageUrl=m;updateNodeEl(node);renderPanel(nodeId);autosave();showToast('Image set');}
+}
+
+// ── NOTES POPOVER ───────────────────────────────────────────
+let notesPopoverEl=null;
+function showNotesPopover(node,anchor){
+  closeNotesPopover();
+  const pop=document.createElement('div');
+  pop.className='notes-popover'; pop.id='notes-popover';
+  pop.innerHTML=`<div class="notes-popover-name">${escHtml(node.name)}</div>${escHtml(node.notes).replace(/\n/g,'<br>')}`;
+  document.body.appendChild(pop);
+  const r=anchor.getBoundingClientRect();
+  let left=r.right+8, top=r.top;
+  if(left+220>window.innerWidth) left=r.left-228;
+  if(top+100>window.innerHeight) top=window.innerHeight-120;
+  pop.style.left=left+'px'; pop.style.top=top+'px';
+  notesPopoverEl=pop;
+  setTimeout(()=>document.addEventListener('click',closeNotesPopoverOutside),50);
+}
+function closeNotesPopover(){
+  if(notesPopoverEl){notesPopoverEl.remove();notesPopoverEl=null;}
+  document.removeEventListener('click',closeNotesPopoverOutside);
+}
+function closeNotesPopoverOutside(e){
+  if(notesPopoverEl&&!notesPopoverEl.contains(e.target)) closeNotesPopover();
+}
+
+// ── BRANCH PILLS ───────────────────────────────────────────
+function renderBranchPills(){
+  branchFilters.innerHTML='';
+  state.branches.forEach(b=>{
+    const count=state.nodes.filter(n=>n.branchId===b.id).length;
+    if(!count) return;
+    const pill=document.createElement('button');
+    pill.className='branch-pill'+(state.activeBranchFilter===b.id?' active':'');
+    pill.textContent=`${b.name} (${count})`;
+    pill.style.background=b.color+'22'; pill.style.borderColor=b.color+'55'; pill.style.color=b.color;
+    pill.addEventListener('click',()=>toggleBranchFilter(b.id));
+    branchFilters.appendChild(pill);
+  });
+}
+
+function toggleBranchFilter(branchId){
+  if(state.activeBranchFilter===branchId){
+    state.activeBranchFilter=null;
+    canvas.querySelectorAll('.node').forEach(el=>el.classList.remove('highlighted'));
+    clearSelection(); updateSelectionVisuals();
+  } else {
+    state.activeBranchFilter=branchId; clearSelection();
+    state.nodes.forEach(n=>{
+      const el=document.getElementById('node-'+n.id);if(!el)return;
+      if(n.branchId===branchId){el.classList.add('highlighted');state.selectedIds.add(n.id);}
+      else el.classList.remove('highlighted');
+    });
+    updateSelectionVisuals();
+    showToast(`Selected all ${state.branches.find(b=>b.id===branchId)?.name||'branch'} members`);
+  }
+  renderBranchPills(); updateStatus(); updateBulkToolbar();
+}
+
+// ── PATH FINDER ────────────────────────────────────────────
+function findPath(startId, endId) {
+  // BFS over all edge types (treating edges as undirected)
+  const queue = [[startId]];
+  const visited = new Set([startId]);
+  while (queue.length) {
+    const path = queue.shift();
+    const current = path[path.length - 1];
+    if (current === endId) return path;
+    state.edges.forEach(e => {
+      const next = e.from === current ? e.to : e.to === current ? e.from : null;
+      if (next && !visited.has(next)) {
+        visited.add(next);
+        queue.push([...path, next]);
+      }
+    });
+  }
+  return null;
+}
+
+function describeRelationship(path) {
+  if (!path || path.length < 2) return 'Same person';
+  const steps = path.length - 1;
+  if (steps === 1) {
+    const e = state.edges.find(e =>
+      (e.from === path[0] && e.to === path[1]) ||
+      (e.from === path[1] && e.to === path[0])
+    );
+    if (!e) return 'Directly connected';
+    const t = e.type;
+    if (t === 'spouse')     return 'Spouses / Partners';
+    if (t === 'biological') return 'Parent / Child';
+    if (t === 'adopted')    return 'Adoptive Parent / Child';
+    if (t === 'potential')  return 'Potential Parent / Child';
+  }
+  if (steps === 2) return 'Siblings or Grandparent–Grandchild';
+  if (steps === 3) return 'Uncle/Aunt – Niece/Nephew, or Great-grandparent';
+  if (steps === 4) return 'First cousins or Great-great-grandparent';
+  if (steps <= 6)  return `Distant relatives (${steps} steps apart)`;
+  return `Very distant relatives (${steps} steps apart)`;
+}
+
+function openPathFinder(preloadId) {
+  const modal = document.getElementById('path-modal');
+  const selA  = document.getElementById('path-person-a');
+  const selB  = document.getElementById('path-person-b');
+  const opts  = state.nodes.map(n=>`<option value="${n.id}">${escHtml(n.name)}</option>`).join('');
+  selA.innerHTML = '<option value="">— Select —</option>' + opts;
+  selB.innerHTML = '<option value="">— Select —</option>' + opts;
+  if (preloadId) selA.value = preloadId;
+  document.getElementById('path-result').innerHTML = '';
+  modal.style.display = 'flex';
+}
+
+document.getElementById('btn-path-finder').addEventListener('click', () => openPathFinder());
+document.getElementById('path-modal-close').addEventListener('click', () => {
+  document.getElementById('path-modal').style.display = 'none';
+  clearPathHighlights();
+});
+document.getElementById('path-modal').addEventListener('click', e => {
+  if (e.target === document.getElementById('path-modal')) {
+    document.getElementById('path-modal').style.display = 'none';
+    clearPathHighlights();
+  }
+});
+
+document.getElementById('path-find-btn').addEventListener('click', () => {
+  const aId = document.getElementById('path-person-a').value;
+  const bId = document.getElementById('path-person-b').value;
+  const res  = document.getElementById('path-result');
+  if (!aId || !bId)      { res.innerHTML = '<p style="color:var(--text3);font-size:12px;margin-top:8px">Select both people.</p>'; return; }
+  if (aId === bId)       { res.innerHTML = '<p style="color:var(--text3);font-size:12px;margin-top:8px">Select two different people.</p>'; return; }
+  const path = findPath(aId, bId);
+  if (!path) {
+    res.innerHTML = '<div style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:12px;margin-top:10px;color:var(--text3);font-size:13px">No connection found — these people are not linked in the tree.</div>';
+    clearPathHighlights(); return;
+  }
+  const rel = describeRelationship(path);
+  const chips = path.map(id => {
+    const n = state.nodes.find(x=>x.id===id);
+    return `<span class="path-node-chip" data-id="${id}">${escHtml(n?n.name:'?')}</span>`;
+  }).join('<span class="path-arrow">→</span>');
+
+  res.innerHTML = `
+    <div style="margin-top:12px">
+      <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:6px">Relationship</div>
+      <div style="font-size:15px;font-weight:600;color:var(--accent);margin-bottom:12px">${escHtml(rel)}</div>
+      <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:6px">Path (${path.length-1} step${path.length-1!==1?'s':''})</div>
+      <div class="path-result-chain">${chips}</div>
+    </div>`;
+
+  // Highlight nodes and edges on canvas
+  highlightPath(path);
+
+  // Click chip to center node
+  res.querySelectorAll('.path-node-chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      const n=state.nodes.find(x=>x.id===chip.dataset.id);
+      if(n){ centerOnNode(n); document.getElementById('path-modal').style.display='none'; }
+    });
+  });
+});
+
+document.getElementById('path-clear-btn').addEventListener('click', () => {
+  clearPathHighlights();
+  document.getElementById('path-result').innerHTML = '';
+});
+
+function highlightPath(path) {
+  clearPathHighlights();
+  const pathSet = new Set(path);
+  canvas.querySelectorAll('.node').forEach(el => {
+    if (pathSet.has(el.dataset.id)) el.classList.add('path-highlight');
+  });
+  const edgeSet = new Set();
+  for (let i=0; i<path.length-1; i++) {
+    const a=path[i], b=path[i+1];
+    state.edges.forEach(e => {
+      if ((e.from===a&&e.to===b)||(e.from===b&&e.to===a)) edgeSet.add(e.id);
+    });
+  }
+  renderEdges(edgeSet);
+}
+
+function clearPathHighlights() {
+  canvas.querySelectorAll('.node.path-highlight').forEach(el=>el.classList.remove('path-highlight'));
+  renderEdges();
+}
+
+// ── TREE STATISTICS ─────────────────────────────────────────
+function calcStats() {
+  const depths = calcGenerations();
+  const maxGen = state.nodes.length ? Math.max(...Object.values(depths)) + 1 : 0;
+  const byBranch = {};
+  state.branches.forEach(b => { byBranch[b.id] = { name: b.name, color: b.color, count: 0 }; });
+  state.nodes.forEach(n => { if(byBranch[n.branchId]) byBranch[n.branchId].count++; });
+  const avgConn = state.nodes.length
+    ? (state.edges.length * 2 / state.nodes.length).toFixed(1) : '0';
+  const noImg = state.nodes.filter(n=>!n.imageUrl).length;
+  const withLink = state.nodes.filter(n=>n.linkUrl).length;
+  return { maxGen, byBranch, avgConn, noImg, withLink,
+    nodes: state.nodes.length, edges: state.edges.length };
+}
+
+function renderStats() {
+  const s=calcStats();
+  const statsPanel=document.getElementById('stats-panel');
+  const topBranches=Object.values(s.byBranch)
+    .filter(b=>b.count>0)
+    .sort((a,b)=>b.count-a.count).slice(0,4);
+  document.getElementById('stats-content').innerHTML=`
+    <div class="stat-row"><span class="stat-label">People</span><span class="stat-value">${s.nodes}</span></div>
+    <div class="stat-row"><span class="stat-label">Connections</span><span class="stat-value">${s.edges}</span></div>
+    <div class="stat-row"><span class="stat-label">Generations</span><span class="stat-value">${s.maxGen}</span></div>
+    <div class="stat-row"><span class="stat-label">Avg connections</span><span class="stat-value">${s.avgConn}</span></div>
+    <div class="stat-row"><span class="stat-label">With portrait</span><span class="stat-value">${s.nodes-s.noImg}</span></div>
+    <div class="stat-row"><span class="stat-label">With bio link</span><span class="stat-value">${s.withLink}</span></div>
+    ${topBranches.map(b=>`<div class="stat-row"><span class="stat-label" style="color:${b.color}">${escHtml(b.name)}</span><span class="stat-value">${b.count}</span></div>`).join('')}`;
+}
+
+document.getElementById('btn-stats').addEventListener('click', () => {
+  const p=document.getElementById('stats-panel');
+  const isOpen=p.classList.toggle('open');
+  document.getElementById('btn-stats').classList.toggle('active',isOpen);
+  if(isOpen) renderStats();
+});
+
+// ── BRANCH MANAGER MODAL ────────────────────────────────────
+let branchModalData=[];
+let colorPickerTarget=null;
+
+function openBranchModal(){
+  branchModalData=JSON.parse(JSON.stringify(state.branches));
+  renderBranchModalBody();
+  document.getElementById('branch-modal').style.display='flex';
+}
+
+function renderBranchModalBody(){
+  const body=document.getElementById('branch-modal-body');
+  body.innerHTML=branchModalData.map((b,i)=>{
+    const count=state.nodes.filter(n=>n.branchId===b.id).length;
+    return `<div class="branch-row" data-idx="${i}">
+      <button class="branch-color-btn" style="background:${b.color}" data-idx="${i}" title="Change colour"></button>
+      <input class="branch-name-input" value="${escHtml(b.name)}" placeholder="Branch name" data-idx="${i}">
+      <span class="branch-count">${count} member${count!==1?'s':''}</span>
+      <button class="branch-del-btn" data-idx="${i}">×</button></div>`;
+  }).join('')+`<p style="font-size:11px;color:var(--text3);margin-top:6px">Click a colour swatch to change it.</p>`;
+  body.querySelectorAll('.branch-color-btn').forEach(btn=>btn.addEventListener('click',e=>{e.stopPropagation();openColorPicker(btn,parseInt(btn.dataset.idx));}));
+  body.querySelectorAll('.branch-name-input').forEach(inp=>inp.addEventListener('input',()=>{branchModalData[parseInt(inp.dataset.idx)].name=inp.value;}));
+  body.querySelectorAll('.branch-del-btn').forEach(btn=>btn.addEventListener('click',()=>{
+    const i=parseInt(btn.dataset.idx);
+    if(confirm(`Delete "${branchModalData[i].name}"?`)){branchModalData.splice(i,1);renderBranchModalBody();}
+  }));
+}
+
+function openColorPicker(btn,idx){
+  closeColorPicker();
+  colorPickerTarget=idx;
+  const popup=document.createElement('div');
+  popup.className='color-picker-popup'; popup.id='color-picker-popup';
+  const grid=document.createElement('div'); grid.className='color-picker-grid';
+  BRANCH_COLORS.forEach(c=>{
+    const sw=document.createElement('div');
+    sw.className='cp-swatch'+(branchModalData[idx].color===c?' active':'');
+    sw.style.background=c;
+    sw.addEventListener('click',()=>{branchModalData[idx].color=c;renderBranchModalBody();closeColorPicker();});
+    grid.appendChild(sw);
+  });
+  const hexRow=document.createElement('div'); hexRow.className='cp-hex-row';
+  const hexInp=document.createElement('input'); hexInp.className='cp-hex-input'; hexInp.value=branchModalData[idx].color; hexInp.maxLength=7;
+  const preview=document.createElement('div'); preview.className='cp-preview'; preview.style.background=branchModalData[idx].color;
+  hexInp.addEventListener('input',()=>{if(/^#[0-9a-fA-F]{6}$/.test(hexInp.value)){branchModalData[idx].color=hexInp.value;preview.style.background=hexInp.value;}});
+  hexRow.appendChild(hexInp); hexRow.appendChild(preview);
+  popup.appendChild(grid); popup.appendChild(hexRow);
+  const r=btn.getBoundingClientRect();
+  popup.style.top=(r.bottom+6)+'px'; popup.style.left=r.left+'px';
+  document.body.appendChild(popup);
+  setTimeout(()=>document.addEventListener('click',closeColorPickerOutside),50);
+}
+function closeColorPickerOutside(e){const p=document.getElementById('color-picker-popup');if(p&&!p.contains(e.target))closeColorPicker();}
+function closeColorPicker(){const p=document.getElementById('color-picker-popup');if(p)p.remove();document.removeEventListener('click',closeColorPickerOutside);}
+
+document.getElementById('btn-branches').addEventListener('click',openBranchModal);
+document.getElementById('branch-modal-close').addEventListener('click',()=>{document.getElementById('branch-modal').style.display='none';closeColorPicker();});
+document.getElementById('branch-modal').addEventListener('click',e=>{if(e.target===document.getElementById('branch-modal')){document.getElementById('branch-modal').style.display='none';closeColorPicker();}});
+document.getElementById('branch-modal-add').addEventListener('click',()=>{branchModalData.push({id:uid(),name:'New Branch',color:BRANCH_COLORS[Math.floor(Math.random()*BRANCH_COLORS.length)]});renderBranchModalBody();});
+document.getElementById('branch-modal-save').addEventListener('click',()=>{snapshot();state.branches=JSON.parse(JSON.stringify(branchModalData));document.getElementById('branch-modal').style.display='none';closeColorPicker();fullRender();autosave();showToast('Branch colours saved');});
+
+// ── BULK BRANCH MODAL ───────────────────────────────────────
+let bulkBranchSelected=null;
+function openBulkBranchModal(){
+  const body=document.getElementById('bulk-branch-modal-body');
+  body.innerHTML=`<p style="font-size:13px;color:var(--text2);margin-bottom:4px">New branch for ${state.selectedIds.size} selected people:</p>`
+    +state.branches.map(b=>`<div class="branch-row" style="cursor:pointer" data-bid="${b.id}"><div style="width:14px;height:14px;border-radius:3px;background:${b.color};flex-shrink:0"></div><span style="font-size:13px;color:var(--text);flex:1">${escHtml(b.name)}</span><span class="branch-count">${state.nodes.filter(n=>n.branchId===b.id).length}</span></div>`).join('')+'<div style="height:4px"></div>';
+  body.querySelectorAll('[data-bid]').forEach(row=>{row.addEventListener('click',()=>{body.querySelectorAll('[data-bid]').forEach(r=>r.style.borderColor='var(--border)');row.style.borderColor='var(--accent)';bulkBranchSelected=row.dataset.bid;});});
+  document.getElementById('bulk-branch-modal').style.display='flex';
+}
+document.getElementById('bulk-branch-modal-close').addEventListener('click',()=>document.getElementById('bulk-branch-modal').style.display='none');
+document.getElementById('bulk-branch-modal-cancel').addEventListener('click',()=>document.getElementById('bulk-branch-modal').style.display='none');
+document.getElementById('bulk-branch-modal-apply').addEventListener('click',()=>{
+  if(!bulkBranchSelected){showToast('Select a branch first');return;}
+  snapshot();
+  state.selectedIds.forEach(id=>{const n=state.nodes.find(x=>x.id===id);if(n){n.branchId=bulkBranchSelected;updateNodeEl(n);}});
+  document.getElementById('bulk-branch-modal').style.display='none';
+  renderBranchPills(); autosave(); showToast(`Branch updated for ${state.selectedIds.size} people`);
+  bulkBranchSelected=null;
+});
+
+// ── BULK OPERATIONS ─────────────────────────────────────────
+document.getElementById('bulk-align-h-btn').addEventListener('click',()=>{
+  const ids=[...state.selectedIds];if(ids.length<2)return;
+  snapshot();
+  const nodes=ids.map(id=>state.nodes.find(n=>n.id===id)).filter(Boolean);
+  const avgY=nodes.reduce((s,n)=>s+n.y,0)/nodes.length;
+  nodes.forEach(n=>{n.y=avgY;updateNodeEl(n);});
+  renderEdges();autosave();showToast('Aligned horizontally');
+});
+document.getElementById('bulk-align-v-btn').addEventListener('click',()=>{
+  const ids=[...state.selectedIds];if(ids.length<2)return;
+  snapshot();
+  const nodes=ids.map(id=>state.nodes.find(n=>n.id===id)).filter(Boolean);
+  const avgX=nodes.reduce((s,n)=>s+n.x,0)/nodes.length;
+  nodes.forEach(n=>{n.x=avgX;updateNodeEl(n);});
+  renderEdges();autosave();showToast('Aligned vertically');
+});
+document.getElementById('bulk-delete-btn').addEventListener('click',()=>{
+  const ids=[...state.selectedIds];if(!ids.length)return;
+  if(!confirm(`Delete ${ids.length} person(s)?`))return;
+  snapshot();
+  ids.forEach(id=>{state.nodes=state.nodes.filter(n=>n.id!==id);state.edges=state.edges.filter(e=>e.from!==id&&e.to!==id);removeNodeEl(id);});
+  clearSelection();renderEdges();updateStatus();autosave();closePanel();showToast(`Deleted ${ids.length} person(s)`);
+});
+document.getElementById('bulk-branch-btn').addEventListener('click',openBulkBranchModal);
+document.getElementById('bulk-move-btn').addEventListener('click',()=>showToast('Drag any selected node to move all together'));
+
+// ── SAVE FILE MANAGER ───────────────────────────────────────
+function getSaves(){try{return JSON.parse(localStorage.getItem('lineage_saves')||'{}');}catch(e){return {};}}
+function setSaves(s){try{localStorage.setItem('lineage_saves',JSON.stringify(s));}catch(e){}}
+function getSaveMeta(){try{return JSON.parse(localStorage.getItem('lineage_saves_meta')||'{}');}catch(e){return {};}}
+function setSaveMeta(m){try{localStorage.setItem('lineage_saves_meta',JSON.stringify(m));}catch(e){}}
+
+function openSavesModal(){renderSavesModalBody();document.getElementById('saves-modal').style.display='flex';}
+
+function renderSavesModalBody(){
+  const saves=getSaves(), meta=getSaveMeta();
+  const body=document.getElementById('saves-modal-body');
+  if(!Object.keys(saves).length){body.innerHTML='<p style="color:var(--text3);font-size:13px;text-align:center;padding:20px 0">No saved trees yet.</p>';return;}
+  body.innerHTML=Object.entries(saves).map(([key,json])=>{
+    const data=JSON.parse(json||'{}');
+    const nc=(data.nodes||[]).length;
+    const saved=meta[key]?new Date(meta[key]).toLocaleDateString():'Unknown';
+    return `<div class="save-file-row ${key===state.activeSave?'active':''}" data-key="${key}">
+      <div class="save-file-icon">🌳</div>
+      <div class="save-file-info"><div class="save-file-name">${escHtml(key)}</div><div class="save-file-meta">${nc} people · ${saved}</div></div>
+      <div class="save-file-actions">
+        ${key!==state.activeSave?`<button class="save-file-btn" data-action="load" data-key="${key}">Load</button>`:'<span style="font-size:11px;color:var(--accent);padding:0 6px">Active</span>'}
+        <button class="save-file-btn" data-action="export" data-key="${key}">Export</button>
+        ${key!==state.activeSave?`<button class="save-file-btn danger" data-action="delete" data-key="${key}">Delete</button>`:''}
+      </div></div>`;
+  }).join('');
+  body.querySelectorAll('[data-action]').forEach(btn=>{
+    btn.addEventListener('click',e=>{
+      e.stopPropagation();
+      const key=btn.dataset.key,action=btn.dataset.action;
+      if(action==='load'){if(confirm(`Load "${key}"? Unsaved changes will be lost.`)){state.activeSave=key;loadSave(key);document.getElementById('saves-modal').style.display='none';}}
+      if(action==='export'){const s=getSaves();const blob=new Blob([s[key]||'{}'],{type:'application/json'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=`lineage-${key}.json`;a.click();URL.revokeObjectURL(url);}
+      if(action==='delete'){if(confirm(`Delete "${key}" permanently?`)){const s=getSaves();delete s[key];setSaves(s);const m=getSaveMeta();delete m[key];setSaveMeta(m);renderSavesModalBody();}}
+    });
+  });
+}
+
+document.getElementById('btn-saves').addEventListener('click',openSavesModal);
+document.getElementById('saves-modal-close').addEventListener('click',()=>document.getElementById('saves-modal').style.display='none');
+document.getElementById('saves-modal').addEventListener('click',e=>{if(e.target===document.getElementById('saves-modal'))document.getElementById('saves-modal').style.display='none';});
+document.getElementById('saves-modal-new').addEventListener('click',()=>{
+  const name=prompt('New tree name:','Tree '+new Date().toLocaleDateString());if(!name)return;
+  state.activeSave=name; state.nodes=[];state.edges=[];state.branches=JSON.parse(JSON.stringify(DEFAULT_BRANCHES));
+  state.camera={x:100,y:80,scale:1};state.selectedIds.clear();
+  autosave();document.getElementById('saves-modal').style.display='none';
+  fullRender();applyCamera();showToast(`New tree "${name}" created`);
+  statusSaveName.textContent=name;
+});
+document.getElementById('saves-modal-save-current').addEventListener('click',()=>{autosave();const m=getSaveMeta();m[state.activeSave]=new Date().toISOString();setSaveMeta(m);showToast(`Saved "${state.activeSave}"`);renderSavesModalBody();});
+
+// ── AUTO-LAYOUT ─────────────────────────────────────────────
+function autoLayout(){
+  if(!state.nodes.length)return;
+  snapshot(); showToast('Arranging…');
+  const HGAP=180,VGAP=240;
+  const parents={};
+  state.nodes.forEach(n=>{parents[n.id]=[];});
+  state.edges.forEach(e=>{if(e.type==='spouse')return;if(!parents[e.to])parents[e.to]=[];parents[e.to].push(e.from);});
+  const roots=state.nodes.filter(n=>!(parents[n.id]||[]).length).map(n=>n.id);
+  if(!roots.length&&state.nodes.length)roots.push(state.nodes[0].id);
+  const layers={};const visited=new Set();
+  const queue=roots.map(id=>({id,d:0}));
+  while(queue.length){const{id,d}=queue.shift();if(visited.has(id))continue;visited.add(id);layers[id]=Math.max(layers[id]||0,d);
+    state.edges.forEach(e=>{if(e.type==='spouse')return;if(e.from===id&&!visited.has(e.to))queue.push({id:e.to,d:d+1});});}
+  state.nodes.forEach(n=>{if(layers[n.id]===undefined)layers[n.id]=0;});
+  const byLayer={};
+  state.nodes.forEach(n=>{const l=layers[n.id];byLayer[l]=byLayer[l]||[];byLayer[l].push(n);});
+  Object.entries(byLayer).forEach(([l,nodes])=>{
+    const y=parseInt(l)*VGAP+60;const tw=nodes.length*HGAP;
+    nodes.forEach((n,i)=>{n.x=i*HGAP-tw/2+600;n.y=y;});
+  });
+  renderAllNodes();renderEdges();renderMinimap();autosave();
+  setTimeout(()=>{fitToScreen();showToast('Layout complete');},100);
+}
+document.getElementById('btn-autolayout').addEventListener('click',autoLayout);
+
+// ── EXPORT ──────────────────────────────────────────────────
+document.getElementById('btn-export-menu').addEventListener('click',()=>{
+  document.getElementById('export-overlay').classList.add('visible');
+});
+document.getElementById('export-cancel').addEventListener('click',()=>{
+  document.getElementById('export-overlay').classList.remove('visible');
+});
+document.getElementById('export-overlay').addEventListener('click',e=>{
+  if(e.target===document.getElementById('export-overlay'))
+    document.getElementById('export-overlay').classList.remove('visible');
+});
+
+document.getElementById('export-json').addEventListener('click',()=>{
+  const blob=new Blob([stateToJSON()],{type:'application/json'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');a.href=url;a.download=`lineage-${state.activeSave}.json`;a.click();
+  URL.revokeObjectURL(url); document.getElementById('export-overlay').classList.remove('visible');
+  showToast('JSON exported');
+});
+
+document.getElementById('export-print').addEventListener('click',()=>{
+  document.getElementById('export-overlay').classList.remove('visible');
+  window.print();
+});
+
+document.getElementById('export-png').addEventListener('click',()=>{
+  document.getElementById('export-overlay').classList.remove('visible');
+  exportPNG();
+});
+
+function exportPNG(){
+  showToast('Preparing PNG…');
+  // Use html2canvas via a CDN-free approach: render to offscreen canvas
+  // Since we can't import html2canvas, we use the browser's built-in approach
+  // by creating a data URL from the SVG layer + a canvas for nodes
+  try {
+    const wrapRect = canvasWrap.getBoundingClientRect();
+
+    // Save camera, then fit everything
+    const savedCam = { ...state.camera };
+    fitToScreen();
+
+    setTimeout(() => {
+      // Use the Canvas API to draw a simplified snapshot
+      const offCanvas = document.createElement('canvas');
+      const scale = 2; // retina
+      offCanvas.width  = wrapRect.width  * scale;
+      offCanvas.height = wrapRect.height * scale;
+      const ctx = offCanvas.getContext('2d');
+
+      // Dark background
+      ctx.fillStyle = '#0d0d0f';
+      ctx.fillRect(0, 0, offCanvas.width, offCanvas.height);
+
+      // Grid dots
+      ctx.fillStyle = 'rgba(255,255,255,0.03)';
+      for (let x=0;x<offCanvas.width;x+=40*scale) for(let y=0;y<offCanvas.height;y+=40*scale) ctx.fillRect(x,y,1,1);
+
+      // Draw edges
+      state.edges.forEach(edge=>{
+        const n1=state.nodes.find(n=>n.id===edge.from);
+        const n2=state.nodes.find(n=>n.id===edge.to);
+        if(!n1||!n2)return;
+        const sx=(n1.x+NODE_W/2)*state.camera.scale+state.camera.x;
+        const sy=(n1.y+NODE_H/2)*state.camera.scale+state.camera.y;
+        const ex=(n2.x+NODE_W/2)*state.camera.scale+state.camera.x;
+        const ey=(n2.y+NODE_H/2)*state.camera.scale+state.camera.y;
+        ctx.beginPath();
+        ctx.moveTo(sx*scale,sy*scale);
+        const my=((sy+ey)/2)*scale;
+        ctx.bezierCurveTo(sx*scale,my,ex*scale,my,ex*scale,ey*scale);
+        if(edge.type==='adopted'){ctx.strokeStyle='rgba(78,126,201,0.6)';ctx.setLineDash([4,3]);}
+        else if(edge.type==='potential'){ctx.strokeStyle='rgba(201,169,110,0.4)';ctx.setLineDash([6,4]);}
+        else if(edge.type==='spouse'){ctx.strokeStyle='rgba(255,255,255,0.2)';ctx.setLineDash([]);}
+        else{ctx.strokeStyle='rgba(201,169,110,0.65)';ctx.setLineDash([]);}
+        ctx.lineWidth=1.5*scale; ctx.stroke(); ctx.setLineDash([]);
+      });
+
+      // Draw nodes
+      state.nodes.forEach(n=>{
+        const x=(n.x*state.camera.scale+state.camera.x)*scale;
+        const y=(n.y*state.camera.scale+state.camera.y)*scale;
+        const w=NODE_W*state.camera.scale*scale;
+        const h=NODE_H*state.camera.scale*scale;
+        const branch=getBranchById(n.branchId);
+        const bColor=branch?branch.color:'#666';
+        const r=8*scale;
+
+        // Card background
+        ctx.fillStyle='#1c1c22';
+        roundRect(ctx,x,y,w,h,r); ctx.fill();
+        ctx.strokeStyle='rgba(255,255,255,0.1)'; ctx.lineWidth=scale;
+        roundRect(ctx,x,y,w,h,r); ctx.stroke();
+
+        // Branch bar
+        ctx.fillStyle=bColor;
+        ctx.fillRect(x,y,w,3*scale);
+
+        // Avatar area
+        ctx.fillStyle='#232329';
+        ctx.fillRect(x,y+3*scale,w,w);
+
+        // Initials
+        ctx.fillStyle='rgba(255,255,255,0.15)';
+        ctx.font=`bold ${24*state.camera.scale*scale}px serif`;
+        ctx.textAlign='center'; ctx.textBaseline='middle';
+        ctx.fillText(getInitials(n.name),x+w/2,y+3*scale+w/2);
+
+        // Name
+        ctx.fillStyle='#f0ede8';
+        ctx.font=`600 ${11*state.camera.scale*scale}px sans-serif`;
+        ctx.textAlign='center';
+        ctx.fillText(n.name||'Unknown',x+w/2,y+3*scale+w+12*state.camera.scale*scale);
+
+        // Branch name
+        ctx.fillStyle=bColor;
+        ctx.font=`${9*state.camera.scale*scale}px sans-serif`;
+        ctx.fillText(branch?branch.name:'',x+w/2,y+3*scale+w+24*state.camera.scale*scale);
+      });
+
+      // Restore camera
+      state.camera = savedCam; applyCamera();
+
+      // Download
+      const link=document.createElement('a');
+      link.download=`lineage-${state.activeSave}.png`;
+      link.href=offCanvas.toDataURL('image/png');
+      link.click();
+      showToast('PNG saved');
+    }, 300);
+  } catch(e) {
+    showToast('PNG export failed — try Print to PDF instead');
+    console.error(e);
+  }
+}
+
+function roundRect(ctx,x,y,w,h,r){
+  ctx.beginPath();
+  ctx.moveTo(x+r,y);ctx.lineTo(x+w-r,y);ctx.quadraticCurveTo(x+w,y,x+w,y+r);
+  ctx.lineTo(x+w,y+h-r);ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);
+  ctx.lineTo(x+r,y+h);ctx.quadraticCurveTo(x,y+h,x,y+h-r);
+  ctx.lineTo(x,y+r);ctx.quadraticCurveTo(x,y,x+r,y);
+  ctx.closePath();
+}
+
+// ── IMPORT ──────────────────────────────────────────────────
+document.getElementById('btn-import').addEventListener('click',()=>document.getElementById('file-import').click());
+document.getElementById('file-import').addEventListener('change',e=>{
+  const file=e.target.files[0];if(!file)return;
+  const r=new FileReader();r.onload=ev=>{loadFromJSON(ev.target.result);autosave();};r.readAsText(file);e.target.value='';
+});
+
+// ── SEARCH ──────────────────────────────────────────────────
+searchInput.addEventListener('input',e=>{
+  const q=e.target.value.trim().toLowerCase();
+  if(!q){canvas.querySelectorAll('.node').forEach(el=>{el.style.opacity='1';el.classList.remove('highlighted');});return;}
+  let first=null;
+  state.nodes.forEach(n=>{
+    const el=document.getElementById('node-'+n.id);if(!el)return;
+    const match=(n.name||'').toLowerCase().includes(q)||(n.title||'').toLowerCase().includes(q)||(n.notes||'').toLowerCase().includes(q);
+    el.style.opacity=match?'1':'0.18';
+    if(match)el.classList.add('highlighted');else el.classList.remove('highlighted');
+    if(match&&!first)first=n;
+  });
+  if(first)centerOnNode(first);
+});
+searchInput.addEventListener('keydown',e=>{if(e.key==='Escape'){searchInput.value='';searchInput.dispatchEvent(new Event('input'));}});
+
+function centerOnNode(node){
+  const wr=canvasWrap.getBoundingClientRect();
+  state.camera.x=wr.width/2-(node.x+NODE_W/2)*state.camera.scale;
+  state.camera.y=wr.height/2-(node.y+NODE_H/2)*state.camera.scale;
+  applyCamera();
+}
+
+function fitToScreen(){
+  if(!state.nodes.length)return;
+  let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
+  state.nodes.forEach(n=>{minX=Math.min(minX,n.x);minY=Math.min(minY,n.y);maxX=Math.max(maxX,n.x+NODE_W);maxY=Math.max(maxY,n.y+NODE_H);});
+  const wr=canvasWrap.getBoundingClientRect(),pad=80;
+  const scale=Math.min((wr.width-pad*2)/Math.max(maxX-minX,1),(wr.height-pad*2)/Math.max(maxY-minY,1),1.5);
+  state.camera.scale=scale;
+  state.camera.x=pad+(wr.width-pad*2-(maxX-minX)*scale)/2-minX*scale;
+  state.camera.y=pad+(wr.height-pad*2-(maxY-minY)*scale)/2-minY*scale;
+  applyCamera();
+}
+
+// ── CONTEXT MENU ────────────────────────────────────────────
+let ctxNodeId=null;
+function showCtxMenu(x,y,nodeId){
+  ctxNodeId=nodeId;ctxMenu.style.left=x+'px';ctxMenu.style.top=y+'px';ctxMenu.style.display='block';
+  requestAnimationFrame(()=>{const r=ctxMenu.getBoundingClientRect();if(r.right>window.innerWidth)ctxMenu.style.left=(x-r.width)+'px';if(r.bottom>window.innerHeight)ctxMenu.style.top=(y-r.height)+'px';});
+}
+function hideCtxMenu(){ctxMenu.style.display='none';ctxNodeId=null;}
+
+document.getElementById('ctx-edit').addEventListener('click',()=>{openPanel(ctxNodeId);hideCtxMenu();});
+document.getElementById('ctx-connect').addEventListener('click',()=>{enterConnectMode(ctxNodeId);hideCtxMenu();});
+document.getElementById('ctx-path-from').addEventListener('click',()=>{openPathFinder(ctxNodeId);hideCtxMenu();});
+document.getElementById('ctx-select-branch').addEventListener('click',()=>{const n=state.nodes.find(n=>n.id===ctxNodeId);if(n&&n.branchId)toggleBranchFilter(n.branchId);hideCtxMenu();});
+document.getElementById('ctx-ancestors').addEventListener('click',()=>{
+  const ancs=getAncestors(ctxNodeId);
+  state.selectedIds=new Set([ctxNodeId,...ancs]);
+  updateSelectionVisuals();showToast(`Selected ${state.selectedIds.size} ancestors`);hideCtxMenu();
+});
+document.getElementById('ctx-descendants').addEventListener('click',()=>{
+  const desc=getDescendants(ctxNodeId);
+  state.selectedIds=new Set([ctxNodeId,...desc]);
+  updateSelectionVisuals();showToast(`Selected ${state.selectedIds.size} descendants`);hideCtxMenu();
+});
+document.getElementById('ctx-delete').addEventListener('click',()=>{const n=state.nodes.find(n=>n.id===ctxNodeId);if(n&&confirm(`Delete "${n.name}"?`))deleteNode(ctxNodeId);hideCtxMenu();});
+document.addEventListener('click',e=>{if(!ctxMenu.contains(e.target))hideCtxMenu();});
+
+// ── SHORTCUTS MODAL ─────────────────────────────────────────
+document.getElementById('btn-shortcuts').addEventListener('click',()=>document.getElementById('shortcuts-modal').style.display='flex');
+document.getElementById('shortcuts-modal-close').addEventListener('click',()=>document.getElementById('shortcuts-modal').style.display='none');
+document.getElementById('shortcuts-modal-close2').addEventListener('click',()=>document.getElementById('shortcuts-modal').style.display='none');
+document.getElementById('shortcuts-modal').addEventListener('click',e=>{if(e.target===document.getElementById('shortcuts-modal'))document.getElementById('shortcuts-modal').style.display='none';});
+
+// ── TOOLBAR BUTTONS ─────────────────────────────────────────
+document.getElementById('btn-add-person').addEventListener('click',()=>addNode());
+document.getElementById('btn-connect').addEventListener('click',()=>{
+  const id=[...state.selectedIds][0];
+  if(id)enterConnectMode(id);else showToast('Select a person first');
+});
+document.getElementById('btn-fit').addEventListener('click',fitToScreen);
+document.getElementById('btn-zoom-in').addEventListener('click',()=>{state.camera.scale=Math.min(3,state.camera.scale*1.2);applyCamera();});
+document.getElementById('btn-zoom-out').addEventListener('click',()=>{state.camera.scale=Math.max(0.1,state.camera.scale*0.85);applyCamera();});
+document.getElementById('btn-zoom-reset').addEventListener('click',()=>{state.camera.scale=1;applyCamera();});
+
+// ── SAVE/LOAD ────────────────────────────────────────────────
+function stateToJSON(){
+  return JSON.stringify({nodes:state.nodes,edges:state.edges,branches:state.branches,camera:state.camera,_version:'3.0',_saved:new Date().toISOString()},null,2);
+}
+function loadFromJSON(json){
+  try{
+    const d=JSON.parse(json);
+    state.nodes=d.nodes||[];state.edges=d.edges||[];
+    state.branches=d.branches&&d.branches.length?d.branches:JSON.parse(JSON.stringify(DEFAULT_BRANCHES));
+    if(d.camera)state.camera=d.camera;
+    state.selectedIds.clear();undoStack.length=0;redoStack.length=0;updateUndoRedoBtns();
+    fullRender();applyCamera();showToast('Tree loaded');
+    statusSaveName.textContent=state.activeSave;
+  }catch(e){showToast('Load error: '+e.message);}
+}
+function autosave(){
+  try{const s=getSaves();s[state.activeSave]=stateToJSON();setSaves(s);const m=getSaveMeta();m[state.activeSave]=new Date().toISOString();setSaveMeta(m);statusSaveName.textContent=state.activeSave;}catch(e){}
+}
+function loadSave(key){const s=getSaves();if(s[key])loadFromJSON(s[key]);}
+
+// ── STATUS ───────────────────────────────────────────────────
+function updateStatus(){
+  const depths=calcGenerations();
+  const maxGen=state.nodes.length?Math.max(...Object.values(depths))+1:0;
+  statusNodes.textContent=`${state.nodes.length} ${state.nodes.length===1?'person':'people'}`;
+  statusEdges.textContent=`${state.edges.length} connection${state.edges.length!==1?'s':''}`;
+  statusGen.textContent=`${maxGen} generation${maxGen!==1?'s':''}`;
+}
+
+// ── TOAST ─────────────────────────────────────────────────────
+let toastTimeout;
+function showToast(msg){toast.textContent=msg;toast.classList.add('show');clearTimeout(toastTimeout);toastTimeout=setTimeout(()=>toast.classList.remove('show'),2600);}
+
+// ── MINIMAP ───────────────────────────────────────────────────
+function renderMinimap(){
+  const mc=minimapCanvas,ctx2=mc.getContext('2d');
+  const W=140,H=90;mc.width=W;mc.height=H;ctx2.clearRect(0,0,W,H);
+  if(!state.nodes.length)return;
+  let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
+  state.nodes.forEach(n=>{minX=Math.min(minX,n.x);minY=Math.min(minY,n.y);maxX=Math.max(maxX,n.x+NODE_W);maxY=Math.max(maxY,n.y+NODE_H);});
+  const pad=8,s=Math.min((W-pad*2)/Math.max(maxX-minX,1),(H-pad*2)/Math.max(maxY-minY,1))*0.9;
+  state.edges.forEach(e=>{const n1=state.nodes.find(n=>n.id===e.from),n2=state.nodes.find(n=>n.id===e.to);if(!n1||!n2)return;ctx2.strokeStyle=e.type==='adopted'?'rgba(78,126,201,0.5)':'rgba(201,169,110,0.4)';ctx2.lineWidth=0.8;ctx2.beginPath();ctx2.moveTo(pad+(n1.x+NODE_W/2-minX)*s,pad+(n1.y+NODE_H/2-minY)*s);ctx2.lineTo(pad+(n2.x+NODE_W/2-minX)*s,pad+(n2.y+NODE_H/2-minY)*s);ctx2.stroke();});
+  state.nodes.forEach(n=>{const b=getBranchById(n.branchId);ctx2.fillStyle=b?b.color:'#888';ctx2.fillRect(pad+(n.x-minX)*s,pad+(n.y-minY)*s,Math.max(NODE_W*s,2),Math.max(NODE_H*s,2));if(state.selectedIds.has(n.id)){ctx2.strokeStyle='rgba(201,169,110,0.9)';ctx2.lineWidth=1;ctx2.strokeRect(pad+(n.x-minX)*s,pad+(n.y-minY)*s,Math.max(NODE_W*s,2),Math.max(NODE_H*s,2));}});
+  const wr=canvasWrap.getBoundingClientRect();ctx2.strokeStyle='rgba(201,169,110,0.45)';ctx2.lineWidth=1;ctx2.strokeRect((-state.camera.x/state.camera.scale-minX)*s+pad,(-state.camera.y/state.camera.scale-minY)*s+pad,(wr.width/state.camera.scale)*s,(wr.height/state.camera.scale)*s);
+}
+document.getElementById('minimap').addEventListener('click',e=>{
+  const mc=minimapCanvas,r=mc.getBoundingClientRect();
+  const mx=(e.clientX-r.left)/r.width,my=(e.clientY-r.top)/r.height;
+  if(!state.nodes.length)return;
+  let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
+  state.nodes.forEach(n=>{minX=Math.min(minX,n.x);minY=Math.min(minY,n.y);maxX=Math.max(maxX,n.x+NODE_W);maxY=Math.max(maxY,n.y+NODE_H);});
+  const wr=canvasWrap.getBoundingClientRect();
+  state.camera.x=wr.width/2-(minX+mx*(maxX-minX))*state.camera.scale;
+  state.camera.y=wr.height/2-(minY+my*(maxY-minY))*state.camera.scale;
+  applyCamera();
+});
+
+// ── KEYBOARD SHORTCUTS ────────────────────────────────────────
+document.addEventListener('keydown',e=>{
+  const inField=e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA'||e.target.tagName==='SELECT';
+  if(!inField){
+    if(e.key==='Escape'){
+      if(connectMode.active){exitConnectMode();}
+      else{clearSelection();closePanel();clearPathHighlights();searchInput.value='';searchInput.dispatchEvent(new Event('input'));}
+      return;
+    }
+    if(e.key==='a'||e.key==='A'){e.preventDefault();addNode();return;}
+    if(e.key==='f'||e.key==='F'){fitToScreen();return;}
+    if(e.key==='l'||e.key==='L'){autoLayout();return;}
+    if(e.key==='b'||e.key==='B'){openBranchModal();return;}
+    if(e.key==='p'||e.key==='P'){openPathFinder();return;}
+    if(e.key==='?'){document.getElementById('shortcuts-modal').style.display='flex';return;}
+    if(e.key==='g'||e.key==='G'){
+      state.showGenLanes=!state.showGenLanes;
+      state.showGenBadges=state.showGenLanes;
+      fullRender();showToast(state.showGenLanes?'Generation lanes on':'Generation lanes off');return;
+    }
+    if((e.key==='Delete'||e.key==='Backspace')&&state.selectedIds.size>0){
+      const ids=[...state.selectedIds];
+      if(confirm(`Delete ${ids.length} person(s)?`)){
+        snapshot();
+        ids.forEach(id=>{state.nodes=state.nodes.filter(n=>n.id!==id);state.edges=state.edges.filter(e=>e.from!==id&&e.to!==id);removeNodeEl(id);});
+        renderEdges();updateStatus();autosave();clearSelection();updateSelectionVisuals();closePanel();
+      }
+      return;
+    }
+  }
+  if((e.ctrlKey||e.metaKey)&&e.key==='z'){e.preventDefault();undo();return;}
+  if((e.ctrlKey||e.metaKey)&&(e.key==='y'||(e.shiftKey&&e.key==='z'))){e.preventDefault();redo();return;}
+  if((e.ctrlKey||e.metaKey)&&e.key==='s'){e.preventDefault();autosave();showToast('Saved');return;}
+  if((e.ctrlKey||e.metaKey)&&e.key==='a'&&!inField){e.preventDefault();state.selectedIds=new Set(state.nodes.map(n=>n.id));updateSelectionVisuals();return;}
+});
+
+// ── SAMPLE DATA ───────────────────────────────────────────────
+function loadSampleData(){
+  const ned    =addNode({name:'Eddard Stark',       branchId:'stark',    x:300, y:200,gender:'Male',  title:'Lord of Winterfell',born:'263 AC',died:'298 AC'});
+  const cat    =addNode({name:'Catelyn Tully',      branchId:'stark',    x:480, y:200,gender:'Female',title:'Lady of Winterfell'});
+  const robb   =addNode({name:'Robb Stark',         branchId:'stark',    x:80,  y:440,gender:'Male',  title:'King in the North'});
+  const sansa  =addNode({name:'Sansa Stark',        branchId:'stark',    x:260, y:440,gender:'Female',title:'Lady of Winterfell'});
+  const arya   =addNode({name:'Arya Stark',         branchId:'stark',    x:440, y:440,gender:'Female'});
+  const bran   =addNode({name:'Bran Stark',         branchId:'stark',    x:620, y:440,gender:'Male',  title:'Three-Eyed Raven'});
+  const rickon =addNode({name:'Rickon Stark',       branchId:'stark',    x:800, y:440,gender:'Male'});
+  const jon    =addNode({name:'Jon Snow',           branchId:'stark',    x:1040,y:440,gender:'Male',  title:'King in the North',born:'281 AC',linkUrl:'https://en.wikipedia.org/wiki/Jon_Snow_(character)',notes:'True name: Aegon Targaryen. Son of Lyanna Stark and Rhaegar Targaryen. Raised by Eddard Stark as a bastard.'});
+  const aerys  =addNode({name:'Aerys II Targaryen', branchId:'targaryen',x:900, y:200,gender:'Male',  title:'The Mad King',died:'283 AC'});
+  const lyanna =addNode({name:'Lyanna Stark',       branchId:'stark',    x:1040,y:200,gender:'Female',born:'266 AC',died:'283 AC'});
+  const dany   =addNode({name:'Daenerys Targaryen', branchId:'targaryen',x:1180,y:440,gender:'Female',title:'Mother of Dragons',born:'284 AC',linkUrl:'https://en.wikipedia.org/wiki/Daenerys_Targaryen'});
+  const rhaegar=addNode({name:'Rhaegar Targaryen',  branchId:'targaryen',x:1100,y:200,gender:'Male',  title:'Crown Prince',died:'283 AC'});
+  const tywin  =addNode({name:'Tywin Lannister',    branchId:'lannister',x:1380,y:200,gender:'Male',  title:'Hand of the King'});
+  const joanna =addNode({name:'Joanna Lannister',   branchId:'lannister',x:1560,y:200,gender:'Female'});
+  const cersei =addNode({name:'Cersei Lannister',   branchId:'lannister',x:1320,y:440,gender:'Female',title:'Queen Regent'});
+  const jaime  =addNode({name:'Jaime Lannister',    branchId:'lannister',x:1500,y:440,gender:'Male',  title:'Kingslayer'});
+  const tyrion =addNode({name:'Tyrion Lannister',   branchId:'lannister',x:1680,y:440,gender:'Male',  title:'The Imp',notes:'The youngest Lannister. Hand of the Queen to Daenerys. Known as the Imp.'});
+  const joffrey=addNode({name:'Joffrey Baratheon',  branchId:'lannister',x:1320,y:680,gender:'Male',  title:'King',died:'300 AC'});
+  const myrcella=addNode({name:'Myrcella Baratheon',branchId:'lannister',x:1500,y:680,gender:'Female'});
+  const tommen =addNode({name:'Tommen Baratheon',   branchId:'lannister',x:1680,y:680,gender:'Male',  title:'King'});
+
+  closePanel();clearSelection();updateSelectionVisuals();undoStack.length=0;redoStack.length=0;updateUndoRedoBtns();
+
+  addEdge(ned.id,cat.id,'spouse');
+  [robb,sansa,arya,bran,rickon].forEach(c=>{addEdge(ned.id,c.id,'biological');addEdge(cat.id,c.id,'biological');});
+  addEdge(aerys.id,lyanna.id,'spouse');
+  addEdge(rhaegar.id,lyanna.id,'spouse');
+  addEdge(rhaegar.id,jon.id,'biological');addEdge(lyanna.id,jon.id,'biological');
+  addEdge(aerys.id,dany.id,'biological');addEdge(aerys.id,rhaegar.id,'biological');
+  addEdge(tywin.id,joanna.id,'spouse');
+  [cersei,jaime,tyrion].forEach(c=>{addEdge(tywin.id,c.id,'biological');addEdge(joanna.id,c.id,'biological');});
+  [joffrey,myrcella,tommen].forEach(c=>{addEdge(cersei.id,c.id,'biological');addEdge(jaime.id,c.id,'biological');});
+
+  fitToScreen();
+}
+
+// ── INIT ──────────────────────────────────────────────────────
+function init(){
+  const saves=getSaves();
+  if(saves[state.activeSave]){loadFromJSON(saves[state.activeSave]);}
+  else{loadSampleData();}
+  applyCamera();
+  statusSaveName.textContent=state.activeSave;
+  showToast('Lineage v3 · G = generation lanes · P = path finder · ? = shortcuts');
+}
+
+init();
+</script>
+</body>
+</html>

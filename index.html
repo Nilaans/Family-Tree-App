@@ -1,0 +1,960 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ChronosTree - Premium UsefulCharts Engine</title>
+    <style>
+        :root {
+            --bg-dark: #0b0f19;
+            --bg-panel: #111827;
+            --bg-card: #1f2937;
+            --text-main: #f9fafb;
+            --text-muted: #9ca3af;
+            --accent: #2563eb;
+            --border: #374151;
+            --grid-line: #1e293b;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0; padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            user-select: none;
+        }
+
+        body {
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+            overflow: hidden;
+            height: 100vh; width: 100vw;
+            display: flex;
+        }
+
+        /* Canvas Workspace */
+        #viewport {
+            position: relative;
+            flex-grow: 1; height: 100%;
+            overflow: hidden; cursor: grab;
+            background-image: radial-gradient(var(--grid-line) 1px, transparent 1px);
+            background-size: 20px 20px;
+        }
+        #viewport:active { cursor: grabbing; }
+        #canvas {
+            position: absolute; top: 0; left: 0;
+            width: 10000px; height: 10000px;
+            transform-origin: 0 0;
+        }
+        
+        #svg-layer {
+            position: absolute;
+            pointer-events: none; z-index: 1;
+        }
+
+        /* Banner */
+        #mode-banner {
+            position: absolute; top: 20px; left: 50%; transform: translateX(-50%);
+            background: #10b981; color: white; padding: 12px 24px;
+            border-radius: 50px; font-weight: bold; z-index: 1000;
+            display: none; box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
+
+        /* UsefulCharts Premium Node Cards */
+        .node-card {
+            position: absolute;
+            width: 150px; height: 190px;
+            background: var(--bg-card);
+            border-radius: 4px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.4);
+            cursor: move; z-index: 2;
+            overflow: hidden;
+            display: flex; flex-direction: column;
+            border: 2px solid transparent;
+            transition: border-color 0.2s, box-shadow 0.2s, opacity 0.3s, top 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.2), left 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.2);
+        }
+        .node-card:hover { box-shadow: 0 0 12px rgba(255,255,255,0.2); }
+        .node-card.selected { border-color: var(--accent) !important; box-shadow: 0 0 20px var(--accent); z-index: 10; }
+        
+        .node-card.path-highlight {
+            border-color: #f59e0b !important;
+            box-shadow: 0 0 25px #f59e0b;
+            z-index: 12;
+            animation: pulse-glow 2s infinite alternate;
+        }
+        .node-card.filtered-out, .node-card.path-dimmed { 
+            opacity: 0.15; 
+            pointer-events: none; 
+        }
+        .node-card.node-hidden {
+            display: none !important;
+        }
+
+        @keyframes pulse-glow {
+            0% { box-shadow: 0 0 12px rgba(245, 158, 11, 0.5); }
+            100% { box-shadow: 0 0 24px rgba(245, 158, 11, 0.9); }
+        }
+
+        .node-image-container {
+            width: 100%; height: 120px;
+            background: #111827; position: relative;
+            display: flex; align-items: center; justify-content: center;
+            border-bottom: 3px solid #64748b;
+        }
+        .node-img { 
+            width: 100%; 
+            height: 100%; 
+            object-fit: cover; 
+            object-position: top;
+        }
+        .node-avatar-placeholder { font-size: 2.5rem; color: #4b5563; }
+
+        .node-details {
+            padding: 8px; flex-grow: 1;
+            display: flex; flex-direction: column; justify-content: center;
+            text-align: center; background: #151f32;
+        }
+        .node-title { font-size: 0.85rem; font-weight: 700; line-height: 1.2; max-height: 2.4em; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+        .node-meta { font-size: 0.7rem; color: var(--text-muted); margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+        /* Floating Controls */
+        .control-bar {
+            position: absolute; bottom: 24px; left: 50%; transform: translateX(-50%);
+            background: rgba(17, 24, 39, 0.85); backdrop-filter: blur(12px);
+            border: 1px solid var(--border); padding: 10px 20px; border-radius: 50px;
+            display: flex; gap: 15px; z-index: 100; align-items: center;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+        }
+        button {
+            background: #27272a; color: var(--text-main);
+            border: 1px solid var(--border); padding: 6px 14px;
+            border-radius: 6px; cursor: pointer; font-size: 0.85rem; font-weight: 500;
+            transition: all 0.2s;
+        }
+        button:hover { background: var(--accent); border-color: var(--accent); }
+        .danger-btn:hover { background: #dc2626 !important; border-color: #dc2626 !important; }
+
+        input, select {
+            background: #0f172a; color: var(--text-main);
+            border: 1px solid var(--border); padding: 6px 12px;
+            border-radius: 6px; font-size: 0.85rem;
+        }
+
+        /* Side Panel UI */
+        .side-panel {
+            width: 380px; background: var(--bg-panel); border-left: 1px solid var(--border);
+            height: 100%; display: flex; flex-direction: column; z-index: 101;
+            position: relative; transition: transform 0.3s ease;
+        }
+        .side-panel.collapsed { transform: translateX(380px); position: absolute; right: 0; }
+        .panel-header { padding: 20px; border-bottom: 1px solid var(--border); }
+        .panel-content { padding: 20px; flex-grow: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 20px; }
+        .form-group { display: flex; flex-direction: column; gap: 6px; }
+        .form-group label { font-size: 0.75rem; font-weight: 600; text-transform: uppercase; color: var(--text-muted); }
+
+        .branch-item { display: flex; align-items: center; gap: 10px; background: #1f2937; padding: 6px 10px; border-radius: 6px; }
+        .color-dot-picker { width: 24px; height: 24px; border-radius: 4px; overflow: hidden; position: relative; border: 1px solid var(--border); }
+        .color-dot-picker input { position: absolute; top:-5px; left:-5px; width:40px; height:40px; cursor: pointer; }
+
+        .path-box { padding: 12px; background: #0f172a; border-radius: 6px; border: 1px solid var(--border); font-size: 0.85rem; line-height: 1.5; }
+        .toggle-panel-btn { position: absolute; left: -40px; top: 20px; width: 40px; height: 40px; background: var(--bg-panel); border: 1px solid var(--border); border-right: none; border-radius: 8px 0 0 8px; color: white; cursor: pointer; }
+    </style>
+</head>
+<body>
+
+    <div id="mode-banner">Link Mode Active: Click target person... (Esc to Exit)</div>
+
+    <div id="viewport">
+        <div id="canvas">
+            <svg id="svg-layer"></svg>
+        </div>
+    </div>
+
+    <div class="control-bar">
+        <input type="text" id="tree-search" placeholder="Search lineage..." style="width: 140px;">
+        <button onclick="zoom(0.1)">+</button>
+        <button onclick="zoom(-0.1)">-</button>
+        <button onclick="resetCamera()">Center</button>
+        <button onclick="snapToGrid()" style="background: #a855f7; border-color: #a855f7;">📐 Snap Layout</button>
+        <button onclick="createNewNode()" style="background: var(--accent); border-color: var(--accent);">+ Person</button>
+        <button onclick="manualSave()" style="background: #10b981; border-color: #10b981;">💾 Save Changes</button>
+    </div>
+
+    <div id="side-panel" class="side-panel">
+        <button class="toggle-panel-btn" onclick="togglePanel()">☰</button>
+        <div class="panel-header"><h3>ChronosTree Manager</h3></div>
+        
+        <div class="panel-content">
+            <div class="form-group">
+                <label>Active Dataset</label>
+                <select id="profile-select" onchange="switchProfile(this.value)"></select>
+                <div style="display: flex; gap: 6px; margin-top: 6px;">
+                    <button onclick="exportJSON()" style="flex: 1;">Export</button>
+                    <button onclick="document.getElementById('import-input').click()" style="flex: 1;">Import</button>
+                </div>
+                <input type="file" id="import-input" style="display:none" onchange="importJSON(event)">
+            </div>
+
+            <div id="editor-ui" style="display:none; flex-direction:column; gap:14px; background:#1f2937; padding:14px; border-radius:8px;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <h4 style="color:var(--accent)">Modify Profile</h4>
+                    <button onclick="autoFetchWikiData()" style="background: #a855f7; border-color: #a855f7; padding: 4px 8px; font-size: 0.75rem;">✨ Wiki Auto-Fetch</button>
+                </div>
+                <div class="form-group">
+                    <label>Name</label>
+                    <input type="text" id="edit-name" oninput="saveNodeEdits()">
+                </div>
+                <div class="form-group">
+                    <label>Dates / Epithet</label>
+                    <input type="text" id="edit-dates" oninput="saveNodeEdits()">
+                </div>
+                <div class="form-group">
+                    <label>House / House Lineage</label>
+                    <select id="edit-branch" onchange="saveNodeEdits()"></select>
+                </div>
+                <div class="form-group">
+                    <label>Wikipedia URL</label>
+                    <div style="display:flex; gap:4px;">
+                        <input type="text" id="edit-link" style="flex-grow: 1" oninput="saveNodeEdits()">
+                        <button onclick="fetchWikiImage()">Fetch Pic</button>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Profile Image Source</label>
+                    <input type="text" id="edit-img" oninput="saveNodeEdits()">
+                </div>
+                
+                <div class="form-group">
+                    <label>Current Connections</label>
+                    <div id="connections-list" style="display:flex; flex-direction:column; gap:6px; max-height:120px; overflow-y:auto; background:#0f172a; padding:6px; border-radius:6px; border:1px solid var(--border);"></div>
+                </div>
+
+                <div class="form-group" style="margin-top:6px; gap:8px;">
+                    <button onclick="initiateRelationshipLink()" style="background:#10b981; color:white; border:none;">🔗 Establish Relationship</button>
+                    <button onclick="deleteCurrentNode()" class="danger-btn">Remove Person</button>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>Relationship Path Finder</label>
+                <div style="display:flex; gap:4px; margin-bottom:6px;">
+                    <select id="path-from" style="width:50%"></select>
+                    <select id="path-to" style="width:50%"></select>
+                </div>
+                
+                <label style="font-size: 0.7rem; font-weight: 600; text-transform: uppercase; color: var(--text-muted); margin-top: 2px;">Include Houses in Search:</label>
+                <div id="path-house-toggles" style="display: flex; flex-direction: column; gap: 6px; max-height: 110px; overflow-y: auto; background: #0f172a; padding: 8px; border-radius: 6px; border: 1px solid var(--border); margin-bottom: 6px;"></div>
+
+                <div style="display:flex; gap:6px;">
+                    <button onclick="findKinshipPath()" style="flex: 2;">Trace Connection</button>
+                    <button onclick="clearPathHighlight()" style="flex: 1; background: #4b5563;">Clear</button>
+                </div>
+                <div id="path-output" class="path-box" style="margin-top:6px;">Select two individuals...</div>
+            </div>
+
+            <div class="form-group">
+                <label>Houses & Branch Colorways</label>
+                <div id="branches-list" style="display:flex; flex-direction:column; gap:6px; margin-bottom:6px;"></div>
+                <button onclick="addNewBranch()">+ Create New House</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let data = {
+            currentProfile: "myths",
+            nodes: {},
+            edges: [],
+            branches: { "Unassigned": "#919191" }
+        };
+
+        let scale = 0.9, panX = 100, panY = 80;
+        let isPanning = false, startX, startY;
+        let draggedId = null, dragOffsets = {};
+        let selectedId = null;
+        let selectedIds = new Set();
+        let linkMode = false, linkSourceId = null;
+        let highlightedNodes = new Set();
+        let disabledHousesForPath = new Set();
+        let hiddenBranches = new Set();
+
+        const viewport = document.getElementById('viewport');
+        const canvas = document.getElementById('canvas');
+        const svgLayer = document.getElementById('svg-layer');
+
+        function safeParseJSON(value, fallback) {
+            if (!value) return fallback;
+            try {
+                return JSON.parse(value);
+            } catch {
+                return fallback;
+            }
+        }
+
+        function init() {
+            let list = safeParseJSON(localStorage.getItem("ct_profile_list"), ["myths"]);
+            localStorage.setItem("ct_profile_list", JSON.stringify(list));
+            
+            let selector = document.getElementById('profile-select');
+            selector.innerHTML = "";
+            list.forEach(p => selector.add(new Option(p.toUpperCase(), p)));
+
+            let active = localStorage.getItem("ct_active_profile") || "myths";
+            switchProfile(active);
+            setupInteractions();
+        }
+
+        function switchProfile(prof) {
+            data.currentProfile = prof;
+            document.getElementById('profile-select').value = prof;
+            localStorage.setItem("ct_active_profile", prof);
+
+            let localData = safeParseJSON(localStorage.getItem(`ct_data_${prof}`), null);
+            if (localData && localData.nodes && localData.branches) {
+                data = localData;
+            } else {
+                data = { currentProfile: prof, nodes: {}, edges: [], branches: { "Unassigned": "#919191" } };
+            }
+            selectedId = null;
+            selectedIds.clear();
+            highlightedNodes.clear();
+            disabledHousesForPath.clear();
+            hiddenBranches.clear();
+            document.getElementById('editor-ui').style.display = 'none';
+            
+            refreshUI();
+            resetCamera();
+        }
+
+        function persist() {
+            localStorage.setItem(`ct_data_${data.currentProfile}`, JSON.stringify(data));
+        }
+
+        function manualSave() {
+            persist();
+            alert("ChronosTree workspace shifts saved successfully to local storage!");
+        }
+
+        function setupInteractions() {
+            viewport.addEventListener('mousedown', (e) => {
+                if (e.target.closest('.node-card') || e.target.closest('.control-bar') || e.target.closest('#side-panel')) return;
+                isPanning = true; startX = e.clientX - panX; startY = e.clientY - panY;
+                
+                if (!e.ctrlKey && !e.metaKey && !e.shiftKey) {
+                    selectedId = null;
+                    selectedIds.clear();
+                    document.querySelectorAll('.node-card').forEach(c => c.classList.remove('selected'));
+                    document.getElementById('editor-ui').style.display = 'none';
+                }
+            });
+            window.addEventListener('mousemove', (e) => {
+                if (isPanning) {
+                    panX = e.clientX - startX; panY = e.clientY - startY;
+                    updateTransforms();
+                } else if (draggedId) {
+                    selectedIds.forEach(id => {
+                        let n = data.nodes[id];
+                        let offset = dragOffsets[id];
+                        if (n && offset) {
+                            n.x = Math.round((e.clientX - panX) / scale - offset.x);
+                            n.y = Math.round((e.clientY - panY) / scale - offset.y);
+                            let card = document.getElementById(`node-${id}`);
+                            if(card) { card.style.left = `${n.x}px`; card.style.top = `${n.y}px`; }
+                        }
+                    });
+                    drawUsefulChartsConnections();
+                }
+            });
+            window.addEventListener('mouseup', () => { if(draggedId) persist(); isPanning = false; draggedId = null; });
+            viewport.addEventListener('wheel', (e) => { e.preventDefault(); zoom(e.deltaY < 0 ? 0.05 : -0.05); }, {passive:false});
+            document.getElementById('tree-search').addEventListener('input', (e) => filterNodes(e.target.value));
+            document.addEventListener('keydown', (e) => { if (e.key === "Escape" && linkMode) exitLinkMode(); });
+        }
+
+        function zoom(amt) { scale = Math.min(Math.max(scale + amt, 0.15), 2.5); updateTransforms(); }
+        function resetCamera() { scale = 0.85; panX = 120; panY = 100; updateTransforms(); }
+        function updateTransforms() { canvas.style.transform = `translate(${panX}px, ${panY}px) scale(${scale})`; }
+
+        function refreshUI() {
+            canvas.querySelectorAll('.node-card').forEach(c => c.remove());
+            Object.values(data.nodes).forEach(n => spawnDOMCard(n));
+            drawUsefulChartsConnections();
+            populateDropdowns();
+            renderHousesPanel();
+        }
+
+        function spawnDOMCard(n) {
+            let card = document.createElement('div');
+            
+            let classes = [`node-card`];
+            if (selectedIds.has(n.id)) classes.push('selected');
+            if (hiddenBranches.has(n.branch || "Unassigned")) classes.push('node-hidden');
+            if (highlightedNodes.size > 0) {
+                if (highlightedNodes.has(n.id)) classes.push('path-highlight');
+                else classes.push('path-dimmed');
+            }
+            
+            card.className = classes.join(' ');
+            card.id = `node-${n.id}`;
+            card.style.left = `${n.x}px`; card.style.top = `${n.y}px`;
+
+            let clr = data.branches[n.branch] || "#919191";
+            let imgBlock = n.image ? `<img class="node-img" src="${n.image}">` : `<div class="node-avatar-placeholder">👤</div>`;
+
+            card.innerHTML = `
+                <div class="node-image-container" style="border-bottom-color: ${clr}">
+                    ${imgBlock}
+                </div>
+                <div class="node-details">
+                    <div class="node-title">${n.name || 'Unknown Entity'}</div>
+                    <div class="node-meta">${n.dates || ''}</div>
+                </div>
+            `;
+
+            card.addEventListener('mousedown', (e) => {
+                e.stopPropagation();
+                if(linkMode) { completeRelationshipLink(n.id); return; }
+                
+                if (e.ctrlKey || e.metaKey || e.shiftKey) {
+                    if (selectedIds.has(n.id)) {
+                        selectedIds.delete(n.id);
+                        card.classList.remove('selected');
+                        if (selectedId === n.id) {
+                            selectedId = selectedIds.size > 0 ? Array.from(selectedIds)[selectedIds.size - 1] : null;
+                        }
+                    } else {
+                        selectedIds.add(n.id);
+                        card.classList.add('selected');
+                        selectedId = n.id;
+                    }
+                } else {
+                    if (!selectedIds.has(n.id)) {
+                        selectedIds.clear();
+                        document.querySelectorAll('.node-card').forEach(c => c.classList.remove('selected'));
+                        selectedIds.add(n.id);
+                        card.classList.add('selected');
+                    }
+                    selectedId = n.id;
+                }
+                
+                if (selectedId && data.nodes[selectedId]) {
+                    showEditor(data.nodes[selectedId]);
+                } else {
+                    document.getElementById('editor-ui').style.display = 'none';
+                }
+                
+                draggedId = n.id;
+                dragOffsets = {};
+                selectedIds.forEach(id => {
+                    let node = data.nodes[id];
+                    if (node) {
+                        dragOffsets[id] = {
+                            x: (e.clientX - panX) / scale - node.x,
+                            y: (e.clientY - panY) / scale - node.y
+                        };
+                    }
+                });
+            });
+
+            canvas.appendChild(card);
+        }
+
+        function snapToGrid() {
+            Object.values(data.nodes).forEach(n => {
+                n.x = Math.round(n.x / 200) * 200 + 25;
+                n.y = Math.round(n.y / 280) * 280 + 40;
+                
+                let card = document.getElementById(`node-${n.id}`);
+                if (card) {
+                    card.style.left = `${n.x}px`;
+                    card.style.top = `${n.y}px`;
+                }
+            });
+            persist();
+            setTimeout(drawUsefulChartsConnections, 250);
+        }
+
+        function drawUsefulChartsConnections() {
+            let nodesArray = Object.values(data.nodes);
+            let minX = 0, minY = 0, maxX = 10000, maxY = 10000;
+            
+            if (nodesArray.length > 0) {
+                let xs = nodesArray.map(n => n.x);
+                let ys = nodesArray.map(n => n.y);
+                minX = Math.min(...xs, 0) - 2000;
+                minY = Math.min(...ys, 0) - 2000;
+                maxX = Math.max(...xs, 10000) + 2000;
+                maxY = Math.max(...ys, 10000) + 2000;
+            }
+            
+            let width = maxX - minX;
+            let height = maxY - minY;
+            
+            svgLayer.setAttribute("viewBox", `${minX} ${minY} ${width} ${height}`);
+            svgLayer.style.left = `${minX}px`;
+            svgLayer.style.top = `${minY}px`;
+            svgLayer.style.width = `${width}px`;
+            svgLayer.style.height = `${height}px`;
+
+            svgLayer.innerHTML = "";
+
+            data.edges.forEach(edge => {
+                let fromNode = data.nodes[edge.from];
+                let toNode = data.nodes[edge.to];
+                if (!fromNode || !toNode) return;
+
+                // Stop execution if either node is part of a hidden tree branch
+                if (hiddenBranches.has(fromNode.branch || "Unassigned") || hiddenBranches.has(toNode.branch || "Unassigned")) return;
+
+                let pathData = "";
+                let strokeColor = "#4b5563";
+                let dashArray = "none";
+                let strokeWidth = "2";
+
+                let isConnectionHighlighted = highlightedNodes.size > 0 && 
+                                              highlightedNodes.has(edge.from) && 
+                                              highlightedNodes.has(edge.to);
+
+                if (edge.type === "marriage" || edge.type === "lover" ? true : false) {
+                    strokeColor = edge.type === "marriage" ? "#e11d48" : "#f59e0b";
+                    strokeWidth = "3";
+                    if(edge.type === "lover") dashArray = "4,4";
+
+                    let leftNode = fromNode.x < toNode.x ? fromNode : toNode;
+                    let rightNode = fromNode.x < toNode.x ? toNode : fromNode;
+
+                    let x1 = leftNode.x + 150;
+                    let y1 = leftNode.y + 60;
+                    let x2 = rightNode.x;
+                    let y2 = rightNode.y + 60;
+                    let midX = x1 + (x2 - x1) / 2;
+
+                    pathData = `M ${x1} ${y1} H ${midX} V ${y2} H ${x2}`;
+                } 
+                else if (edge.type === "biological" || edge.type === "adopted" || edge.type === "potential") {
+                    if (edge.type === "adopted") dashArray = "2,4";
+                    if (edge.type === "potential") dashArray = "6,6";
+                    
+                    let parentBranchName = fromNode.branch || "Unassigned";
+                    strokeColor = data.branches[parentBranchName] || "#9ca3af";
+                    strokeWidth = "2.5";
+
+                    let parentCenterX = fromNode.x + 75;
+                    let parentBottomY = fromNode.y + 190;
+                    let childCenterX = toNode.x + 75;
+                    let childTopY = toNode.y;
+                    
+                    let midHeightY = parentBottomY + (childTopY - parentBottomY) / 2;
+                    pathData = `M ${parentCenterX} ${parentBottomY} V ${midHeightY} H ${childCenterX} V ${childTopY}`;
+                }
+
+                let pathNode = document.createElementNS("http://www.w3.org/2000/svg", "path");
+                pathNode.setAttribute("d", pathData);
+                
+                if (highlightedNodes.size > 0) {
+                    if (isConnectionHighlighted) {
+                        pathNode.setAttribute("stroke", "#f59e0b");
+                        pathNode.setAttribute("stroke-width", parseFloat(strokeWidth) + 1.5);
+                    } else {
+                        pathNode.setAttribute("stroke", "#1e293b");
+                        pathNode.setAttribute("opacity", "0.15");
+                    }
+                } else {
+                    pathNode.setAttribute("stroke", strokeColor);
+                    pathNode.setAttribute("stroke-width", strokeWidth);
+                }
+
+                pathNode.setAttribute("stroke-dasharray", dashArray);
+                pathNode.setAttribute("fill", "none");
+                svgLayer.appendChild(pathNode);
+            });
+        }
+
+        function showEditor(n) {
+            document.getElementById('editor-ui').style.display = 'flex';
+            document.getElementById('edit-name').value = n.name || '';
+            document.getElementById('edit-dates').value = n.dates || '';
+            document.getElementById('edit-link').value = n.link || '';
+            document.getElementById('edit-img').value = n.image || '';
+
+            let bSelect = document.getElementById('edit-branch');
+            bSelect.innerHTML = "";
+            Object.keys(data.branches).forEach(b => bSelect.add(new Option(b, b)));
+            bSelect.value = n.branch || "Unassigned";
+
+            renderConnectionsList(n.id);
+        }
+
+        /* Added: Live list generation engine for connections associated with selected profile node */
+        function renderConnectionsList(nodeId) {
+            let container = document.getElementById('connections-list');
+            if (!container) return;
+            container.innerHTML = "";
+            
+            let relevantEdges = data.edges.filter(e => e.from === nodeId || e.to === nodeId);
+            if (relevantEdges.length === 0) {
+                container.innerHTML = `<div style="font-size:0.75rem; color:var(--text-muted); text-align:center; padding:6px;">No active connections</div>`;
+                return;
+            }
+            
+            relevantEdges.forEach(edge => {
+                let isFrom = edge.from === nodeId;
+                let otherId = isFrom ? edge.to : edge.from;
+                let otherNode = data.nodes[otherId];
+                if (!otherNode) return;
+                
+                let displayType = edge.type;
+                if (edge.type === "biological") displayType = isFrom ? "Parent of" : "Child of";
+                else if (edge.type === "adopted") displayType = isFrom ? "Adopted Parent of" : "Adopted Child of";
+                else if (edge.type === "potential") displayType = isFrom ? "Potential Parent of" : "Potential Child of";
+                else if (edge.type === "marriage") displayType = "Spouse of";
+                else if (edge.type === "lover") displayType = "Partner of";
+
+                let item = document.createElement('div');
+                item.style = "display:flex; justify-content:space-between; align-items:center; background:#111827; padding:4px 8px; border-radius:4px; font-size:0.8rem; border:1px solid var(--border);";
+                item.innerHTML = `
+                    <span style="color:var(--text-muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:210px;">
+                        ${displayType} <b>${otherNode.name}</b>
+                    </span>
+                    <button class="danger-btn" style="padding:2px 6px; font-size:0.75rem; margin-left:8px;" onclick="deleteConnection('${edge.id}', '${nodeId}')">✕</button>
+                `;
+                container.appendChild(item);
+            });
+        }
+
+        /* Added: Function execution to sever an existing structural connection string */
+        function deleteConnection(edgeId, nodeId) {
+            if(!confirm("Permanently sever this relationship connection line?")) return;
+            data.edges = data.edges.filter(e => e.id !== edgeId);
+            persist();
+            drawUsefulChartsConnections();
+            renderConnectionsList(nodeId);
+        }
+
+        function saveNodeEdits() {
+            if(!selectedId) return;
+            let n = data.nodes[selectedId];
+            n.name = document.getElementById('edit-name').value;
+            n.dates = document.getElementById('edit-dates').value;
+            n.branch = document.getElementById('edit-branch').value;
+            n.link = document.getElementById('edit-link').value;
+            n.image = document.getElementById('edit-img').value;
+
+            persist();
+            let card = document.getElementById(`node-${n.id}`);
+            if(card) {
+                let clr = data.branches[n.branch] || "#919191";
+                card.querySelector('.node-image-container').style.borderBottomColor = clr;
+                card.querySelector('.node-title').innerText = n.name;
+                card.querySelector('.node-meta').innerText = n.dates;
+                if(n.image) {
+                    let imgEl = card.querySelector('.node-img');
+                    if(imgEl) imgEl.src = n.image;
+                    else card.querySelector('.node-image-container').innerHTML = `<img class="node-img" src="${n.image}">`;
+                } else {
+                    card.querySelector('.node-image-container').innerHTML = `<div class="node-avatar-placeholder">👤</div>`;
+                }
+            }
+            drawUsefulChartsConnections();
+            populateDropdowns();
+            renderConnectionsList(selectedId);
+        }
+
+        function createNewNode() {
+            let id = "node_" + Date.now();
+            let x = Math.round((-panX + viewport.clientWidth/2)/scale - 75);
+            let y = Math.round((-panY + viewport.clientHeight/2)/scale - 95);
+            data.nodes[id] = { id, name: "New Profile", dates: "Unknown Timeline", branch: "Unassigned", image: "", link: "", x, y };
+            persist(); 
+            
+            selectedIds.clear();
+            selectedIds.add(id);
+            selectedId = id;
+            
+            refreshUI(); 
+            showEditor(data.nodes[id]);
+        }
+
+        function deleteCurrentNode() {
+            if(selectedIds.size === 0) return;
+            if(!confirm(`Permanently delete the ${selectedIds.size} selected individual(s)? All relationships connected to them will be deleted.`)) return;
+            
+            selectedIds.forEach(id => {
+                data.edges = data.edges.filter(e => e.from !== id && e.to !== id);
+                delete data.nodes[id];
+            });
+            
+            selectedId = null;
+            selectedIds.clear();
+            document.getElementById('editor-ui').style.display = 'none';
+            persist(); refreshUI();
+        }
+
+        function initiateRelationshipLink() {
+            if(!selectedId) return;
+            linkMode = true; linkSourceId = selectedId;
+            document.getElementById('mode-banner').style.display = 'block';
+        }
+
+        function exitLinkMode() { linkMode = false; linkSourceId = null; document.getElementById('mode-banner').style.display = 'none'; }
+
+        function completeRelationshipLink(targetId) {
+            if(targetId === linkSourceId) { alert("An individual cannot be linked to themselves."); exitLinkMode(); return; }
+            let mode = prompt("Specify connection mapping category:\n1. Biological Offspring\n2. Spouse / Marriage Line\n3. Lover / Secret Affair Line\n4. Adopted Lineage\n5. Potential / Unverified Child");
+            let tStr = "";
+            if(mode === "1") tStr = "biological";
+            else if(mode === "2") tStr = "marriage";
+            else if(mode === "3") tStr = "lover";
+            else if(mode === "4") tStr = "adopted";
+            else if(mode === "5") tStr = "potential";
+
+            if(tStr) {
+                data.edges.push({ id: "edge_"+Date.now(), from: linkSourceId, to: targetId, type: tStr });
+                persist(); drawUsefulChartsConnections();
+                if(selectedId) renderConnectionsList(selectedId);
+            }
+            exitLinkMode();
+        }
+
+        /* Wikipedia Smart Auto-Fetch Engine */
+        async function autoFetchWikiData() {
+            if(!selectedId) return;
+            let currentName = document.getElementById('edit-name').value.trim();
+            if(!currentName || currentName === "New Profile") {
+                return alert("Please enter a valid query name first.");
+            }
+
+            try {
+                let searchRes = await fetch(`https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(currentName)}&utf8=&format=json&origin=*`);
+                let searchParsed = await searchRes.json();
+                
+                if(!searchParsed.query.search || searchParsed.query.search.length === 0) {
+                    return alert(`No matching items found on Wikipedia for "${currentName}".`);
+                }
+
+                let matchedTitle = searchParsed.query.search[0].title;
+                let generatedUrl = `https://en.wikipedia.org/wiki/${encodeURIComponent(matchedTitle.replace(/ /g, "_"))}`;
+                
+                document.getElementById('edit-link').value = generatedUrl;
+
+                let picRes = await fetch(`https://en.wikipedia.org/w/api.php?action=query&titles=${encodeURIComponent(matchedTitle)}&prop=pageimages&format=json&pithumbsize=400&origin=*`);
+                let picParsed = await picRes.json();
+                let pageKey = Object.keys(picParsed.query.pages)[0];
+                
+                if(picParsed.query.pages[pageKey].thumbnail) {
+                    document.getElementById('edit-img').value = picParsed.query.pages[pageKey].thumbnail.source;
+                } else {
+                    document.getElementById('edit-img').value = "";
+                }
+                
+                saveNodeEdits();
+            } catch(err) {
+                alert("Error connecting to the auto-fetch API database engines.");
+            }
+        }
+
+        async function fetchWikiImage() {
+            if(!selectedId) return;
+            let url = document.getElementById('edit-link').value;
+            if(!url.includes("wikipedia.org/wiki/")) return alert("Ensure a valid Wikipedia endpoint URL is input.");
+            try {
+                let segment = url.split("/wiki/")[1];
+                let res = await fetch(`https://en.wikipedia.org/w/api.php?action=query&titles=${segment}&prop=pageimages&format=json&pithumbsize=400&origin=*`);
+                let parsed = await res.json();
+                let pageKey = Object.keys(parsed.query.pages)[0];
+                if(parsed.query.pages[pageKey].thumbnail) {
+                    document.getElementById('edit-img').value = parsed.query.pages[pageKey].thumbnail.source;
+                    saveNodeEdits();
+                } else alert("Wikimedia returned no featured profile thumbnail asset for this entry.");
+            } catch(err) { alert("Error connecting to Wiki API engine."); }
+        }
+
+        function renderHousesPanel() {
+            let container = document.getElementById('branches-list');
+            container.innerHTML = "";
+            Object.entries(data.branches).forEach(([name, color]) => {
+                let div = document.createElement('div');
+                div.className = "branch-item";
+                let isUnassigned = name === "Unassigned";
+                let isVisible = !hiddenBranches.has(name);
+                div.innerHTML = `
+                    <input type="checkbox" ${isVisible ? 'checked' : ''} onchange="toggleBranchVisibility('${name}', this.checked)" title="Toggle Canvas Visibility" style="cursor:pointer; width:14px; height:14px;">
+                    <div class="color-dot-picker">
+                        <input type="color" value="${color}" onchange="modifyBranchColor('${name}', this.value)">
+                    </div>
+                    <span style="flex-grow:1; font-size:0.85rem">${name}</span>
+                    ${!isUnassigned ? `<button class="danger-btn" style="padding:2px 8px; font-size:0.75rem;" onclick="removeBranch('${name}')">X</button>` : ''}
+                `;
+                container.appendChild(div);
+            });
+            renderPathHouseToggles();
+        }
+
+        function toggleBranchVisibility(name, isChecked) {
+            if (isChecked) {
+                hiddenBranches.delete(name);
+            } else {
+                hiddenBranches.add(name);
+            }
+            refreshUI();
+        }
+
+        function toggleHouseForPath(name, isChecked) {
+            if (isChecked) {
+                disabledHousesForPath.delete(name);
+            } else {
+                disabledHousesForPath.add(name);
+            }
+        }
+
+        function renderPathHouseToggles() {
+            let container = document.getElementById('path-house-toggles');
+            if (!container) return;
+            container.innerHTML = "";
+            Object.keys(data.branches).forEach(bName => {
+                let lbl = document.createElement('label');
+                lbl.style.display = "flex";
+                lbl.style.alignItems = "center";
+                lbl.style.gap = "8px";
+                lbl.style.fontSize = "0.8rem";
+                lbl.style.cursor = "pointer";
+                lbl.style.color = "var(--text-main)";
+                
+                let isChecked = !disabledHousesForPath.has(bName);
+                lbl.innerHTML = `
+                    <input type="checkbox" ${isChecked ? 'checked' : ''} onchange="toggleHouseForPath('${bName}', this.checked)" style="cursor:pointer;">
+                    <span style="width:12px; height:12px; border-radius:3px; background:${data.branches[bName] || '#919191'}; display:inline-block;"></span>
+                    <span>${bName}</span>
+                `;
+                container.appendChild(lbl);
+            });
+        }
+
+        function addNewBranch() {
+            let name = prompt("Assign distinct House title name:");
+            if(!name || data.branches[name]) return;
+            data.branches[name] = "#" + Math.floor(Math.random()*16777215).toString(16).padStart(6, '0');
+            persist(); renderHousesPanel(); saveNodeEdits();
+        }
+
+        function modifyBranchColor(name, color) {
+            data.branches[name] = color; persist(); refreshUI();
+        }
+
+        function removeBranch(name) {
+            if(name === "Unassigned") return;
+            if(!confirm(`Are you sure you want to delete the house [${name}]? All members belonging to this family line will automatically revert back to 'Unassigned'.`)) return;
+            Object.values(data.nodes).forEach(n => { if(n.branch === name) n.branch = "Unassigned"; });
+            delete data.branches[name];
+            disabledHousesForPath.delete(name);
+            hiddenBranches.delete(name);
+            persist(); refreshUI();
+        }
+
+        function populateDropdowns() {
+            let f = document.getElementById('path-from'); let t = document.getElementById('path-to');
+            f.innerHTML = ""; t.innerHTML = "";
+            let sorted = Object.values(data.nodes).sort((a,b)=>a.name.localeCompare(b.name));
+            sorted.forEach(n => { f.add(new Option(n.name, n.id)); t.add(new Option(n.name, n.id)); });
+        }
+
+        function findKinshipPath() {
+            let start = document.getElementById('path-from').value;
+            let target = document.getElementById('path-to').value;
+            let out = document.getElementById('path-output');
+            if(!start || !target) return;
+            if(start === target) { out.innerText = "Target entities are the same individual."; return; }
+
+            let adj = {}; Object.keys(data.nodes).forEach(k => adj[k] = []);
+            data.edges.forEach(e => {
+                if(!adj[e.from] || !adj[e.to]) return;
+
+                let fromNode = data.nodes[e.from];
+                let toNode = data.nodes[e.to];
+                let fromBranch = fromNode.branch || "Unassigned";
+                let toBranch = toNode.branch || "Unassigned";
+
+                // Bypass and isolate logic if node's house has been disabled (unless it's the direct origin/destination endpoint)
+                if (disabledHousesForPath.has(fromBranch) && e.from !== start && e.from !== target) return;
+                if (disabledHousesForPath.has(toBranch) && e.to !== start && e.to !== target) return;
+
+                adj[e.from].push({ node: e.to, label: e.type === "marriage" || e.type === "lover" ? "Partner to" : "Parent of" });
+                adj[e.to].push({ node: e.from, label: e.type === "marriage" || e.type === "lover" ? "Partner to" : "Offspring of" });
+            });
+
+            let queue = [{ id: start, trail: [], nodeHistory: [start] }];
+            let visited = new Set([start]);
+            let trace = null;
+
+            while(queue.length > 0) {
+                let curr = queue.shift();
+                if(curr.id === target) { trace = curr; break; }
+                for(let edge of adj[curr.id]) {
+                    if(!visited.has(edge.node)) {
+                        visited.add(edge.node);
+                        queue.push({ 
+                            id: edge.node, 
+                            trail: [...curr.trail, `${edge.label} <b>${data.nodes[edge.node].name}</b>`],
+                            nodeHistory: [...curr.nodeHistory, edge.node]
+                        });
+                    }
+                }
+            }
+            if(trace) {
+                out.innerHTML = `<b>${data.nodes[start].name}</b> is the:<br/>` + trace.trail.join("<br/> ↳ ");
+                highlightedNodes = new Set(trace.nodeHistory);
+            } else {
+                out.innerHTML = "No interconnected path tracked across registered branches.";
+                highlightedNodes.clear();
+            }
+            updateHighlightUIClasses();
+        }
+
+        function clearPathHighlight() {
+            highlightedNodes.clear();
+            document.getElementById('path-output').innerHTML = "Select two individuals...";
+            updateHighlightUIClasses();
+        }
+
+        function updateHighlightUIClasses() {
+            Object.values(data.nodes).forEach(n => {
+                let card = document.getElementById(`node-${n.id}`);
+                if(!card) return;
+                card.classList.remove('path-highlight', 'path-dimmed');
+                if (highlightedNodes.size > 0) {
+                    if(highlightedNodes.has(n.id)) card.classList.add('path-highlight');
+                    else card.classList.add('path-dimmed');
+                }
+            });
+            drawUsefulChartsConnections();
+        }
+
+        function filterNodes(q) {
+            q = q.toLowerCase();
+            Object.values(data.nodes).forEach(n => {
+                let el = document.getElementById(`node-${n.id}`);
+                if(!el) return;
+                if(n.name.toLowerCase().includes(q) || n.branch.toLowerCase().includes(q)) el.classList.remove('filtered-out');
+                else el.classList.add('filtered-out');
+            });
+        }
+
+        function togglePanel() { document.getElementById('side-panel').classList.toggle('collapsed'); }
+        function exportJSON() {
+            let str = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(data, null, 2));
+            let a = document.createElement('a'); a.href = str; a.download = `chronostree_${data.currentProfile}_export.json`; a.click();
+        }
+        function importJSON(e) {
+            let r = new FileReader();
+            r.onload = function(evt) {
+                try {
+                    let parsed = JSON.parse(evt.target.result);
+                    if(parsed.nodes && parsed.branches) { data = parsed; persist(); refreshUI(); resetCamera(); }
+                } catch(err) { alert("Malformed export tracking format structural metadata."); }
+            }
+            if(e.target.files[0]) r.readAsText(e.target.files[0]);
+        }
+
+        window.onload = init;
+    </script>
+</body>
+</html>
